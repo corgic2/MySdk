@@ -13,15 +13,15 @@ class FileSystem
     FileSystem();
     ~FileSystem();
     //读写文件
-    bool WriteStringToFile(std::string str, std::string filePath);
-    std::string ReadStringFromFile(std::string filePath);
+    static bool WriteStringToFile(std::string str, std::string filePath);
+    static void ReadStringFromFile(std::string filePath, std::string& outData);
     //文件存在
-    bool FileIsExists(std::string filePath);
-    bool FolderIsExists(std::string path);
+    static bool FileIsExists(std::string filePath);
+    static bool FolderIsExists(std::string path);
     //创建文件
-    bool TryCreateFile(std::string path, std::string name);
-    bool TryCreateFolder(std::string path, std::string folderName);
+    static bool TryCreateFile(std::string path, std::string name);
+    static bool TryCreateFolder(std::string path, std::string folderName);
     //删除文件
-    bool DeleteFile(std::string path);
-    bool DeleteFolder(std::string path);
+    static bool DeleteFile(std::string path);
+    static bool DeleteFolder(std::string path);
 };
