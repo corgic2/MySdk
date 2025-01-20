@@ -27,3 +27,10 @@ target_link_libraries(SDK PRIVATE
     /path/to/FileSystem/lib/libFileSystem.a
     /path/to/JsonObject/lib/libJsonObject.a
 )
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/x64)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/x64)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/x64)
+
+add_subdirectory(FileSystem)
+add_subdirectory(JsonObject)
