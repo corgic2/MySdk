@@ -1,36 +1,47 @@
 cmake_minimum_required(VERSION 3.10)
 project(SDK)
+set(TARGET_NAME SDK)
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT SDK)
 
 # Enable debugging symbols
 set(CMAKE_BUILD_TYPE Debug)
-set(TARGET_NAME SDK)
+
+# Add compiler flags for debugging
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
 # 启用C++11
 add_compile_options(-std=c++11)
 # 解决节数超过对象文件格式限制
 add_compile_options(-bigobj)
 
-file(GLOB_RECURSE SRC_FILE "*.cpp" "*.cxx" "*.cc" "*.C" "*.c++" "*.h" "*.hpp" "*.H" "*.hxx")
+# 是否x86 还是x64，默认x64
+if(CMAKE_CL_64)
+    SET(PLATFORM_CPU "x64")
+else()
+    SET(PLATFORM_CPU "x86")
+endif()
+MESSAGE(STATUS "PLATFORM_CPU: ${PLATFORM_CPU}")
 
-add_executable(SDK ./main.cpp)
+# 设置输出路径
+if(${PLATFORM_CPU} STREQUAL "x64")
+    SET(EXECUTE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/x64/)
+else()
+    SET(EXECUTE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/Win32/)
+endif()
 
-# Add compiler flags for debugging
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${EXECUTE_OUTPUT_PATH})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${EXECUTE_OUTPUT_PATH})
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${EXECUTE_OUTPUT_PATH})
+
+aux_source_directory(. DIR_SRCS)
+aux_source_directory(FileSystem DIR_SRCS)
+aux_source_directory(JsonObject DIR_SRCS)
+add_executable(SDK ${DIR_SRCS})
 
 # Include directories for FileSystem and JsonObject
 target_include_directories(${TARGET_NAME} PUBLIC .)
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/FileSystem)
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/jsonObject)
-
-# Link against the necessary libraries
-target_link_libraries(SDK PRIVATE 
-    /path/to/FileSystem/lib/libFileSystem.a
-    /path/to/JsonObject/lib/libJsonObject.a
-)
-
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/x64)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/x64)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/x64)
 
 add_subdirectory(FileSystem)
 add_subdirectory(JsonObject)
