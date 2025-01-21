@@ -29,7 +29,6 @@ echo "Copy Successfully"
 endlocal
 
 :: 进入构建目录并运行 CMake
-cd /d "%BUILD_DIR%"
 echo Generating Visual Studio solution...
 cmake -G "Visual Studio 15 2017" ..
 
