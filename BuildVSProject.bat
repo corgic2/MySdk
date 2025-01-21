@@ -2,6 +2,7 @@
 md build
 cd build && cmake .. 
 
+
 @echo off
 setlocal enabledelayedexpansion
 
@@ -26,5 +27,32 @@ for /R "%SOURCE_DIR%" %%f in (*.h) do (
 echo "Copy Successfully"
 
 endlocal
+
+:: 进入构建目录并运行 CMake
+cd /d "%BUILD_DIR%"
+echo Generating Visual Studio solution...
+cmake -G "Visual Studio 15 2017" ..
+
+:: 检查 CMake 是否成功
+if %ERRORLEVEL% neq 0 (
+    echo CMake failed to generate the solution.
+    pause
+    exit /b 1
+)
+
+echo Solution generated successfully.
+
+:: 编译项目
+echo Building the project...
+cmake --build . --config Release
+
+:: 检查编译是否成功
+if %ERRORLEVEL% neq 0 (
+    echo Build failed.
+    pause
+    exit /b 1
+)
+
+echo Build completed successfully.
 
 pause
