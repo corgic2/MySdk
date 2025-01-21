@@ -1,4 +1,9 @@
-﻿#include "FileSystem.h"
+﻿#include <fstream>
+#include <iostream>
+#include <cstdlib>
+#include <windows.h>
+#include "FileSystem.h"
+
 
 FileSystem::FileSystem()
 {
@@ -8,41 +13,100 @@ FileSystem::~FileSystem()
 {
 }
 
-bool FileSystem::WriteStringToFile(std::string str, std::string filePath)
+bool FileSystem::WriteStringToFile(const std::string& filePath, const std::string& fileName, const std::string& str)
 {
+    
+    if(false == FolderIsExists(filePath))
+    {
+        return false;
+    }
+
+    if(false == FileIsExists(filePath,fileName))
+    {
+        return false;   
+    }
+
+    std::ofstream file(filePath + "/" + fileName);
+    //文件流没有被打开
+    
+    if(!file.is_open())
+    {
+        return false;
+    }
+
+    //写入
+    file<<str;
+    file.close();
     return true;
 }
 
-void FileSystem::ReadStringFromFile(std::string filePath, std::string& outData)
+void FileSystem::ReadStringFromFile(const std::string& filePath, const std::string& fileName, std::string& outData)
 {
 }
 
-bool FileSystem::FileIsExists(std::string filePath)
+bool FileSystem::FileIsExists(const std::string& filePath, const std::string& fileName)
 {
-    return true;
+
+    if(false == FolderIsExists(filePath))
+    {
+        return false;
+    }
+
+    //在打开文件时若文件不存在则默认会创建文件
+    std::ifstream file(filePath);
+    bool bOpen = file.is_open();
+    file.close();
+    return bOpen;
 }
 
-bool FileSystem::FolderIsExists(std::string path)
+bool FileSystem::FolderIsExists(const std::string& path)
 {
-    return true;
+    DWORD attributes = GetFileAttributesA(path.c_str());
+    return (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY));
 }
 
-bool FileSystem::TryCreateFile(std::string path, std::string name)
+bool FileSystem::TryCreateFile(const std::string& path, const std::string& name)
 {
-    return true;
+    
+    if(false == FolderIsExists(path))
+    {
+        return false;
+    }
+
+    return FileIsExists(path,name);
 }
 
-bool FileSystem::TryCreateFolder(std::string path, std::string folderName)
+bool FileSystem::TryCreateFolder(const std::string& path, const std::string& folderName)
 {
-    return true;
+
+    if(false == FolderIsExists(path))
+    {
+        return false;
+    }
+
+    int ret = system(("cd " + path + "\n" + "mkdir " + folderName).c_str());
+    return ret == 0;
 }
 
-bool FileSystem::DeleteFile(std::string path)
+bool FileSystem::TryDeleteFile(const std::string& filePath,const std::string& fileName)
 {
-    return true;
+
+    if(false == FolderIsExists(filePath))
+    {
+        return false;
+    }
+
+    return std::remove((filePath + "/" +  fileName).c_str());
 }
 
-bool FileSystem::DeleteFolder(std::string path)
+bool FileSystem::TryDeleteFolder(const std::string& filePath)
 {
-    return true;
+
+    if(false == FolderIsExists(filePath))
+    {
+        return false;
+    }
+
+    int ret = system(("rmdir /s /q " + filePath).c_str());
+    return ret == 0;
 }
