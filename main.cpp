@@ -17,7 +17,7 @@ void FileSystemTest()
     {
         std::cout << "Folder does not exist. Attempting to create it..." << std::endl;
 
-        if (FileSystem::TryCreateFolder(testFilePath,testFileName))
+        if (FileSystem::TryCreateFolder(testFilePath, testFileName))
         {
             std::cout << "Folder created successfully." << std::endl;
         }
@@ -97,6 +97,24 @@ void FileSystemTest()
     }
 
     std::cout << "All tests completed." << std::endl;
+    /*输出结果
+        Testing FileSystem...
+        Testing FolderIsExists...
+        Folder does not exist. Attempting to create it...
+        Folder created successfully.
+        Testing FileIsExists...
+        File does not exist. Attempting to create it...
+        File created successfully.
+        Testing WriteStringToFile...
+        String written to file successfully.
+        Testing ReadStringFromFile...
+        Read from file: Hello, FileSystem!
+        Testing TryDeleteFile...
+        File deleted successfully.
+        Testing TryDeleteFolder...
+        Folder deleted successfully.
+        All tests completed.
+    */
 }
 
 int main()
