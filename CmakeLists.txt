@@ -34,6 +34,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${EXECUTE_OUTPUT_PATH})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${EXECUTE_OUTPUT_PATH})
 
 file(GLOB_RECURSE HEADER_FILES "*.h")
+list(FILTER HEADER_FILES EXCLUDE REGEX "include/.*\\.h$")
 
 aux_source_directory(. DIR_SRCS)
 aux_source_directory(FileSystem DIR_SRCS)
@@ -41,9 +42,8 @@ aux_source_directory(JsonObject DIR_SRCS)
 add_executable(SDK ${HEADER_FILES} ${DIR_SRCS})
 
 # Include directories for FileSystem and JsonObject
-target_include_directories(${TARGET_NAME} PUBLIC .)
-target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/FileSystem)
-target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/jsonObject)
+target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/include)
+
 
 add_subdirectory(FileSystem)
 add_subdirectory(JsonObject)

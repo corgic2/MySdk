@@ -10,6 +10,7 @@
 
 class FileSystem
 {
+public:
     FileSystem();
     ~FileSystem();
     //读写文件
