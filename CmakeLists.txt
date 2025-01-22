@@ -1,49 +1,50 @@
+# 指定CMake的最低版本
 cmake_minimum_required(VERSION 3.10)
+
+# 设置项目名称
 project(SDK)
+
+# 设置目标名称
 set(TARGET_NAME SDK)
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT SDK)
-
-# Enable debugging symbols
-set(CMAKE_BUILD_TYPE Debug)
-
-# Add compiler flags for debugging
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
 # 启用C++11
 add_compile_options(-std=c++11)
+
 # 解决节数超过对象文件格式限制
 add_compile_options(-bigobj)
 
-# 是否x86 还是x64，默认x64
-if(CMAKE_CL_64)
-    SET(PLATFORM_CPU "x64")
+# 检测平台（x86 或 x64）
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(PLATFORM_CPU "x64")
 else()
-    SET(PLATFORM_CPU "x86")
+    set(PLATFORM_CPU "x86")
 endif()
-MESSAGE(STATUS "PLATFORM_CPU: ${PLATFORM_CPU}")
+message(STATUS "PLATFORM_CPU: ${PLATFORM_CPU}")
 
 # 设置输出路径
-if(${PLATFORM_CPU} STREQUAL "x64")
-    SET(EXECUTE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/x64/)
-else()
-    SET(EXECUTE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/Win32/)
-endif()
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_CPU})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_CPU})
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_CPU})
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${EXECUTE_OUTPUT_PATH})
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${EXECUTE_OUTPUT_PATH})
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${EXECUTE_OUTPUT_PATH})
-
+# 收集头文件（排除特定目录）
 file(GLOB_RECURSE HEADER_FILES "*.h")
 list(FILTER HEADER_FILES EXCLUDE REGEX "include/.*\\.h$")
 
+# 收集源文件
 aux_source_directory(. DIR_SRCS)
 aux_source_directory(FileSystem DIR_SRCS)
 aux_source_directory(JsonObject DIR_SRCS)
-add_executable(SDK ${HEADER_FILES} ${DIR_SRCS})
 
-# Include directories for FileSystem and JsonObject
-target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/include)
+# 添加可执行文件
+add_executable(${TARGET_NAME}_exe ${HEADER_FILES} ${DIR_SRCS})
 
+# 添加动态库
+add_library(${TARGET_NAME}_lib SHARED ${DIR_SRCS})
 
+# 包含目录
+target_include_directories(${TARGET_NAME}_exe PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(${TARGET_NAME}_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
+
+# 添加子模块
 add_subdirectory(FileSystem)
 add_subdirectory(JsonObject)
