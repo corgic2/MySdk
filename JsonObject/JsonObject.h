@@ -6,9 +6,11 @@
 // </remarks>
 // ************************************************************
 #include <string>
+#include <vector>
 #include <unordered_map>
 #include "FileSystem.h"
-#if 0
+#if 1
+
 // 用于存放JsonObject对象
 class JsonObjectPrivate
 {
@@ -22,20 +24,44 @@ public:
         Null,
         Number
     };
+
+    union JsonValue{
+        std::string strValue;
+        bool booleanValue;
+        double numberValue;
+        std::nullptr_t pointerValue;
+        std::vector<JsonObjectPrivate> vectorValue;
+        std::unordered_map<std::string, JsonObjectPrivate> mapValue;
+    };
+
     JsonObjectPrivate();
     ~JsonObjectPrivate();
-    //从index开始以后的内容转化为Object,Array,Value等
-    JsonObjectPrivate ParseObject(const std::string& content,size_t &index);
-    JsonObjectPrivate ParseArray(const std::string& content,size_t &index);
-    JsonObjectPrivate ParseValue(const std::string& content,size_t &index);
+
+    JsonObjectPrivate(const JsonObjectPrivate &jsonObj);
+    JsonObjectPrivate &operator=(const JsonObjectPrivate &jsonObj);
+
+    // 从index开始以后的内容转化为Object,Array,Value等
+    JsonObjectPrivate ParseObject(const std::string &content, size_t &index);
+    JsonObjectPrivate ParseArray(const std::string &content, size_t &index);
+    JsonObjectPrivate ParseValue(const std::string &content, size_t &index);
 
     // SetAndGet对象类型
     void SetValueType(const EM_JsonValue &enumValue);
-    void GetValueType();
+    EM_JsonValue GetValueType();
 
+    //根据Key，SetAndGet JsonObjPrivate对象
+    JsonObjectPrivate& GetJsonObj(const std::string& key);
+    void SetJsonObjValue(const std::string& key,const JsonObjectPrivate& jsonObject);
+
+    //给Array 添加Json对象
+    void AddJsonObjToJsonArray(const JsonObjectPrivate& key);
+
+    // 获取存储的值
+    JsonValue& GetValue();
+    void SetValue(JsonValue& value);
 private:
-    std::unordered_map<std::string, JsonObjectPrivate> m_JsonObject;
-    EM_JsonValue m_valueType = EM_JsonValue::Object;
+    JsonValue m_JsonObject; // 存储实际的值
+    EM_JsonValue m_valueType = EM_JsonValue::Object; // 对JsonValue的标识
 };
 
 class JsonObject
@@ -48,9 +74,10 @@ public:
     JsonObject &operator=(const JsonObject &obj);
     // SetAndGet 实例对象
     void SetJsonObject(const JsonObject &obj);
-    JsonObjectPrivate& GetJsonObject();
+    JsonObjectPrivate &GetJsonObject();
+
 private:
     std::string m_content;
     JsonObjectPrivate m_obj;
 };
-#endif 
+#endif
