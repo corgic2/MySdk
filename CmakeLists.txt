@@ -7,6 +7,9 @@ project(SDK)
 # 设置目标名称
 set(TARGET_NAME SDK)
 
+# 设置启动项目
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT SDK)
+
 # 启用C++11
 add_compile_options(-std=c++11)
 
@@ -34,17 +37,15 @@ list(FILTER HEADER_FILES EXCLUDE REGEX "include/.*\\.h$")
 aux_source_directory(. DIR_SRCS)
 aux_source_directory(FileSystem DIR_SRCS)
 aux_source_directory(JsonObject DIR_SRCS)
+aux_source_directory(INIParseObject DIR_SRCS)
 
 # 添加可执行文件
-add_executable(${TARGET_NAME}_exe ${HEADER_FILES} ${DIR_SRCS})
-
-# 添加动态库
-add_library(${TARGET_NAME}_lib SHARED ${DIR_SRCS})
+add_executable(${TARGET_NAME} ${HEADER_FILES} ${DIR_SRCS})
 
 # 包含目录
-target_include_directories(${TARGET_NAME}_exe PUBLIC ${CMAKE_SOURCE_DIR}/include)
-target_include_directories(${TARGET_NAME}_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
 # 添加子模块
 add_subdirectory(FileSystem)
 add_subdirectory(JsonObject)
+add_subdirectory(INIParseObject)
