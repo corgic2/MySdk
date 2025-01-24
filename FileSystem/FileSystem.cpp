@@ -1,9 +1,11 @@
 ﻿#include <fstream>
+#include <filesystem>
 #include <iostream>
 #include <cstdlib>
 #include <windows.h>
 #include "FileSystem.h"
-
+namespace my_sdk
+{
 FileSystem::FileSystem()
 {
 }
@@ -12,20 +14,21 @@ FileSystem::~FileSystem()
 {
 }
 
-bool FileSystem::WriteStringToFile(const std::string &filePath, const std::string &fileName, const std::string &str)
+std::string FileSystemUtils::CombinePath(const std::string& path1, const std::string& path2)
 {
+    // 创建 path1 和 path2 的拷贝，以避免修改原始输入
+    std::string path1Copy = path1;
+    std::string path2Copy = path2;
+    // 替换正斜杠为反斜杠
+    std::replace(path1Copy.begin(), path1Copy.end(), '/', '\\');
+    std::replace(path2Copy.begin(), path2Copy.end(), '/', '\\');
+    // 拼接路径
+    return path1Copy + "\\" + path2Copy;
+}
 
-    if (false == FolderIsExists(filePath))
-    {
-        return false;
-    }
-
-    if (false == FileIsExists(filePath, fileName))
-    {
-        return false;
-    }
-
-    std::ofstream file(filePath + "/" + fileName);
+bool FileSystem::WriteStringToFile(const std::string& filePath, const std::string& fileName, const std::string& str)
+{
+    std::ofstream file(FileSystemUtils::CombinePath(filePath, fileName));
     // 文件流没有被打开
 
     if (!file.is_open())
@@ -39,73 +42,16 @@ bool FileSystem::WriteStringToFile(const std::string &filePath, const std::strin
     return true;
 }
 
-void FileSystem::ReadStringFromFile(const std::string &filePath, const std::string &fileName, std::string &outData)
+void FileSystem::ReadStringFromFile(const std::string& filePath, const std::string& fileName, std::string& outData)
 {
-}
+    std::ifstream file(FileSystemUtils::CombinePath(filePath, fileName));
 
-bool FileSystem::FileIsExists(const std::string &filePath, const std::string &fileName)
-{
-
-    if (false == FolderIsExists(filePath))
+    if (!file.is_open())
     {
-        return false;
+        return;
     }
 
-    // 在打开文件时若文件不存在则默认会创建文件
-    std::ifstream file(filePath);
-    bool bOpen = file.is_open();
+    outData.assign((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     file.close();
-    return bOpen;
 }
-
-bool FileSystem::FolderIsExists(const std::string &path)
-{
-    DWORD attributes = GetFileAttributesA(path.c_str());
-    return (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY));
-}
-
-bool FileSystem::TryCreateFile(const std::string &path, const std::string &name)
-{
-
-    if (false == FolderIsExists(path))
-    {
-        return false;
-    }
-
-    return FileIsExists(path, name);
-}
-
-bool FileSystem::TryCreateFolder(const std::string &path, const std::string &folderName)
-{
-
-    if (false == FolderIsExists(path))
-    {
-        return false;
-    }
-
-    int ret = system(("cd " + path + "\n" + "mkdir " + folderName).c_str());
-    return ret == 0;
-}
-
-bool FileSystem::TryDeleteFile(const std::string &filePath, const std::string &fileName)
-{
-
-    if (false == FolderIsExists(filePath))
-    {
-        return false;
-    }
-
-    return std::remove((filePath + "/" + fileName).c_str());
-}
-
-bool FileSystem::TryDeleteFolder(const std::string &filePath)
-{
-
-    if (false == FolderIsExists(filePath))
-    {
-        return false;
-    }
-
-    int ret = system(("rmdir /s /q " + filePath).c_str());
-    return ret == 0;
 }

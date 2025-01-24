@@ -2,7 +2,6 @@
 md build
 cd build && cmake .. 
 
-
 @echo off
 setlocal enabledelayedexpansion
 
@@ -19,14 +18,16 @@ if not exist "%TARGET_DIR%" (
 :: 复制当前目录及其子目录中的所有头文件到目标目录
 for /R "%SOURCE_DIR%" %%f in (*.h) do (
     if "%%~dpf" neq "%TARGET_DIR%" (
-        copy "%%f" "%TARGET_DIR%" >nul
-		echo "Coping Files : " %%f
+        copy /Y "%%f" "%TARGET_DIR%" >nul
+		if errorlevel 1 (
+			echo "Failed to copy: %%f"
+		) else (
+			echo "Copying Files: %%f"
+		)
     )
 )
 
 echo "Copy Successfully"
-
-endlocal
 
 :: 进入构建目录并运行 CMake
 echo Generating Visual Studio solution...
