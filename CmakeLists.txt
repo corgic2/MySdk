@@ -10,8 +10,10 @@ set(TARGET_NAME SDK)
 # 设置启动项目
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT SDK)
 
-# 启用C++11
-add_compile_options(-std=c++11)
+# 启用C++17
+add_compile_options(-std=c++17)
+
+
 
 # 解决节数超过对象文件格式限制
 add_compile_options(-bigobj)
