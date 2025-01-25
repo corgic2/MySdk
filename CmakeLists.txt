@@ -13,8 +13,6 @@ set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT S
 # 启用C++17
 add_compile_options(-std=c++17)
 
-
-
 # 解决节数超过对象文件格式限制
 add_compile_options(-bigobj)
 

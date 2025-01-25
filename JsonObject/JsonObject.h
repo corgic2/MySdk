@@ -11,77 +11,88 @@
 #include <unordered_map>
 #include "FileSystem.h"
 #if 1
-
 namespace my_sdk
 {
-    // 用于存放JsonObject对象
-    class JsonObjectPrivate
-    {
-    public:
-        enum EM_JsonValue
-        {
-            Object,
-            Array,
-            String,
-            Boolean,
-            Null,
-            Number
-        };
+class JsonObjectPrivate;
+enum EM_JsonValue
+{
+    Object,
+    Array,
+    String,
+    Boolean,
+    Null,
+    Number
+};
 
-        union JsonValue{
-            std::string strValue;
-            bool booleanValue;
-            double numberValue;
-            std::nullptr_t pointerValue;
-            std::vector<JsonObjectPrivate> vectorValue;
-            std::unordered_map<std::string, JsonObjectPrivate> mapValue;
-        };
+class JsonValue
+{
+public:
+    JsonValue();
+    ~JsonValue();
 
-        JsonObjectPrivate();
-        ~JsonObjectPrivate();
+    JsonValue(const JsonValue& obj);
+    JsonValue& operator=(const JsonValue& obj);
+    void Clear();
 
-        JsonObjectPrivate(const JsonObjectPrivate &jsonObj);
-        JsonObjectPrivate &operator=(const JsonObjectPrivate &jsonObj);
+public:
+    std::string strValue;
+    bool booleanValue;
+    double numberValue;
+    std::nullptr_t pointerValue;
+    std::vector<JsonObjectPrivate> vectorValue;
+    std::unordered_map<std::string, JsonObjectPrivate> mapValue;
+};
 
-        // 从index开始以后的内容转化为Object,Array,Value等
-        JsonObjectPrivate ParseObject(const std::string &content, size_t &index);
-        JsonObjectPrivate ParseArray(const std::string &content, size_t &index);
-        JsonObjectPrivate ParseValue(const std::string &content, size_t &index);
+// 用于存放JsonObject对象
+class JsonObjectPrivate
+{
+public:
 
-        // SetAndGet对象类型
-        void SetValueType(const EM_JsonValue &enumValue);
-        EM_JsonValue GetValueType();
+    JsonObjectPrivate();
+    ~JsonObjectPrivate();
 
-        //根据Key，SetAndGet JsonObjPrivate对象
-        JsonObjectPrivate& GetJsonObj(const std::string& key);
-        void SetJsonObjValue(const std::string& key,const JsonObjectPrivate& jsonObject);
+    JsonObjectPrivate(const JsonObjectPrivate& jsonObj);
+    JsonObjectPrivate& operator=(const JsonObjectPrivate& jsonObj);
 
-        //给Array 添加Json对象
-        void AddJsonObjToJsonArray(const JsonObjectPrivate& key);
+    // 从index开始以后的内容转化为Object,Array,Value等
+    JsonObjectPrivate ParseObject(const std::string& content, size_t& index);
+    JsonObjectPrivate ParseArray(const std::string& content, size_t& index);
+    JsonObjectPrivate ParseValue(const std::string& content, size_t& index);
 
-        // 获取存储的值
-        JsonValue& GetValue();
-        void SetValue(JsonValue& value);
-    private:
-        JsonValue m_JsonObject; // 存储实际的值
-        EM_JsonValue m_valueType = EM_JsonValue::Object; // 对JsonValue的标识
-    };
+    // SetAndGet对象类型
+    void SetValueType(const EM_JsonValue& enumValue);
+    EM_JsonValue GetValueType();
 
-    class JsonObject
-    {
-    public:
-        JsonObject();
-        JsonObject(const std::string &filePath); // 从文件中读取转化Json对象
-        ~JsonObject();
+    //根据Key，SetAndGet JsonObjPrivate对象
+    JsonObjectPrivate& GetJsonObj(const std::string& key);
+    void SetJsonObjValue(const std::string& key, const JsonObjectPrivate& jsonObject);
 
-        JsonObject &operator=(const JsonObject &obj);
-        // SetAndGet 实例对象
-        void SetJsonObject(const JsonObject &obj);
-        JsonObjectPrivate &GetJsonObject();
+    //给Array 添加Json对象
+    void AddJsonObjToJsonArray(const JsonObjectPrivate& key);
 
-    private:
-        std::string m_content;
-        JsonObjectPrivate m_obj;
-    };
+    // 获取存储的值
+    JsonValue& GetValue();
+    void SetValue(JsonValue& value);
+private:
+    JsonValue m_JsonObject; // 存储实际的值
+    EM_JsonValue m_valueType = EM_JsonValue::Object; // 对JsonValue的标识
+};
+
+class JsonObject
+{
+public:
+    JsonObject();
+    JsonObject(const std::string& filePath); // 从文件中读取转化Json对象
+    ~JsonObject();
+
+    JsonObject& operator=(const JsonObject& obj);
+    // SetAndGet 实例对象
+    void SetJsonObject(const JsonObject& obj);
+    JsonObjectPrivate& GetJsonObject();
+
+private:
+    std::string m_content;
+    JsonObjectPrivate m_obj;
+};
 }
 #endif
