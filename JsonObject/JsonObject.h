@@ -35,12 +35,11 @@ public:
     void Clear();
 
 public:
-    std::string strValue;
-    bool booleanValue;
-    double numberValue;
-    std::nullptr_t pointerValue;
-    std::vector<JsonObjectPrivate> vectorValue;
-    std::unordered_map<std::string, JsonObjectPrivate> mapValue;
+    std::string m_strValue = "";
+    bool m_booleanValue = false;
+    double m_numberValue = 0;
+    std::nullptr_t m_pointerValue;
+    std::unordered_map<std::string, JsonObjectPrivate> m_mapValue;
 };
 
 // 用于存放JsonObject对象
@@ -61,20 +60,20 @@ public:
 
     // SetAndGet对象类型
     void SetValueType(const EM_JsonValue& enumValue);
-    EM_JsonValue GetValueType();
+    EM_JsonValue GetValueType() const;
 
-    //根据Key，SetAndGet JsonObjPrivate对象
-    JsonObjectPrivate& GetJsonObj(const std::string& key);
+    //根据当前层的Key，SetAndGet JsonObjPrivate对象
+    JsonObjectPrivate& GetJsonObj(const std::string& key) const;
     void SetJsonObjValue(const std::string& key, const JsonObjectPrivate& jsonObject);
 
-    //给Array 添加Json对象
-    void AddJsonObjToJsonArray(const JsonObjectPrivate& key);
+    //添加Json对象
+    void AddJsonObj(const std::string& key, const JsonObjectPrivate& jsonObject);
 
     // 获取存储的值
-    JsonValue& GetValue();
+    JsonValue& GetValue() const;
     void SetValue(JsonValue& value);
 private:
-    JsonValue m_JsonObject; // 存储实际的值
+    JsonValue* m_jsonObject = nullptr; // 存储实际的值
     EM_JsonValue m_valueType = EM_JsonValue::Object; // 对JsonValue的标识
 };
 
@@ -82,7 +81,7 @@ class JsonObject
 {
 public:
     JsonObject();
-    JsonObject(const std::string& filePath); // 从文件中读取转化Json对象
+    JsonObject(const std::string& filePath, const std::string& fileName); // 从文件中读取转化Json对象
     ~JsonObject();
 
     JsonObject& operator=(const JsonObject& obj);
@@ -92,7 +91,7 @@ public:
 
 private:
     std::string m_content;
-    JsonObjectPrivate m_obj;
+    JsonObjectPrivate m_obj = JsonObjectPrivate();
 };
 }
 #endif
