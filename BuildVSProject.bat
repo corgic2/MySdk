@@ -31,7 +31,7 @@ echo "Copy Successfully"
 
 :: 进入构建目录并运行 CMake
 echo Generating Visual Studio solution...
-cmake -G "Visual Studio 17 2022" ..
+cmake -G "Visual Studio 15 2017" ..
 
 :: 检查 CMake 是否成功
 if %ERRORLEVEL% neq 0 (

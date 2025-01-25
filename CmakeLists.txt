@@ -38,6 +38,7 @@ aux_source_directory(. DIR_SRCS)
 aux_source_directory(FileSystem DIR_SRCS)
 aux_source_directory(JsonObject DIR_SRCS)
 aux_source_directory(INIParseObject DIR_SRCS)
+aux_source_directory(SDKCommonDefine DIR_SRCS)
 
 # 添加可执行文件
 add_executable(${TARGET_NAME} ${HEADER_FILES} ${DIR_SRCS})
@@ -49,3 +50,4 @@ target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/include)
 add_subdirectory(FileSystem)
 add_subdirectory(JsonObject)
 add_subdirectory(INIParseObject)
+add_subdirectory(SDKCommonDefine)
