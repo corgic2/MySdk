@@ -71,17 +71,170 @@ my_sdk::JsonObjectPrivate& my_sdk::JsonObjectPrivate::operator=(const JsonObject
 
 my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseObject(const std::string& content, size_t& index)
 {
-    return JsonObjectPrivate();
+    JsonObjectPrivate result;
+    result.SetValueType(EM_JsonValue::Object);
+
+    while (index < content.size())
+    {
+        char ch = content[index];
+
+        if (ch == '}')
+        {
+            ++index; // 跳过闭合的 '}'
+            break;
+        }
+        else if (ch == '"')
+        {
+            ++index; // 跳过开始的 '"'
+            size_t keyStart = index;
+
+            while (index < content.size() && content[index] != '"')
+            {
+                ++index;
+            }
+
+            std::string key = content.substr(keyStart, index - keyStart);
+            ++index; // 跳过结束的 '"'
+
+            // 跳过冒号
+            while (index < content.size() && (content[index] == ' ' || content[index] == ':'))
+            {
+                ++index;
+            }
+
+            // 解析值
+            JsonObjectPrivate value = ParseValue(content, index);
+            result.AddJsonObj(key, value);
+
+            // 跳过逗号
+            while (index < content.size() && (content[index] == ' ' || content[index] == ','))
+            {
+                ++index;
+            }
+        }
+        else
+        {
+            ++index; // 跳过其他字符
+        }
+    }
+
+    return result;
 }
 
 my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseArray(const std::string& content, size_t& index)
 {
-    return JsonObjectPrivate();
+    JsonObjectPrivate result;
+    result.SetValueType(EM_JsonValue::Array);
+
+    while (index < content.size())
+    {
+        char ch = content[index];
+
+        if (ch == ']')
+        {
+            ++index; // 跳过闭合的 ']'
+            break;
+        }
+        else if (ch == ' ' || ch == ',')
+        {
+            ++index; // 跳过空格和逗号
+        }
+        else
+        {
+            // 解析数组元素
+            JsonObjectPrivate value = ParseValue(content, index);
+            result.AddJsonObj(std::to_string(result.GetValue().m_mapValue.size()), value);
+        }
+    }
+
+    return result;
 }
 
 my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseValue(const std::string& content, size_t& index)
 {
-    return JsonObjectPrivate();
+    JsonObjectPrivate result;
+
+    while (index < content.size())
+    {
+        char ch = content[index];
+
+        if (ch == '{')
+        {
+            ++index; // 跳过开始的 '{'
+            result = ParseObject(content, index);
+            break;
+        }
+        else if (ch == '[')
+        {
+            ++index; // 跳过开始的 '['
+            result = ParseArray(content, index);
+            break;
+        }
+        else if (ch == '"')
+        {
+            ++index; // 跳过开始的 '"'
+            size_t start = index;
+
+            while (index < content.size() && content[index] != '"')
+            {
+                ++index;
+            }
+
+            result.GetValue().m_strValue = content.substr(start, index - start);
+            result.SetValueType(EM_JsonValue::String);
+            ++index; // 跳过结束的 '"'
+            break;
+        }
+        else if (ch == 't' || ch == 'f')
+        {
+            // 解析布尔值
+            if (content.substr(index, 4) == "true")
+            {
+                result.GetValue().m_booleanValue = true;
+                index += 4;
+            }
+            else if (content.substr(index, 5) == "false")
+            {
+                result.GetValue().m_booleanValue = false;
+                index += 5;
+            }
+
+            result.SetValueType(EM_JsonValue::Boolean);
+            break;
+        }
+        else if (ch == 'n')
+        {
+            // 解析null
+            if (content.substr(index, 4) == "null")
+            {
+                result.GetValue().m_pointerValue = nullptr;
+                index += 4;
+            }
+
+            result.SetValueType(EM_JsonValue::Null);
+            break;
+        }
+        else if (ch == '-' || (ch >= '0' && ch <= '9'))
+        {
+            // 解析数字
+            size_t start = index;
+
+            while (index < content.size() && (content[index] == '-' || content[index] == '.' || (content[index] >= '0' && content[index] <= '9')))
+            {
+                ++index;
+            }
+
+            result.GetValue().m_numberValue = std::stod(content.substr(start, index - start));
+            result.SetValueType(EM_JsonValue::Number);
+            break;
+        }
+        else
+        {
+            ++index; // 跳过其他字符
+        }
+    }
+
+    return result;
 }
 
 void my_sdk::JsonObjectPrivate::SetValueType(const EM_JsonValue& enumValue)
@@ -156,12 +309,16 @@ void my_sdk::JsonObjectPrivate::SetValue(JsonValue& value)
     SAFE_DELETE_POINTER_VALUE(m_jsonObject)
     m_jsonObject = new JsonValue(value);
 }
+
 my_sdk::JsonObject::JsonObject()
 {
 }
+
 my_sdk::JsonObject::JsonObject(const std::string& filePath, const std::string& fileName)
 {
     FileSystem::ReadStringFromFile(filePath, fileName, m_content);
+    size_t index = 0;
+    m_obj = m_obj.ParseObject(m_content, index);
 }
 my_sdk::JsonObject::~JsonObject()
 {
