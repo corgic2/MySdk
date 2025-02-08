@@ -1,4 +1,5 @@
 ﻿#include <fstream>
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <cstdlib>
