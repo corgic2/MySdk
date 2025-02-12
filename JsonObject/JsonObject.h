@@ -7,26 +7,27 @@
 // ************************************************************
 #pragma once
 #include <string>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 #include "../FileSystem/FileSystem.h"
 #if 1
 namespace my_sdk
 {
-class JsonObjectPrivate;
-enum EM_JsonValue
-{
+  class JsonObjectPrivate;
+
+  enum EM_JsonValue
+  {
     Object,
     Array,
     String,
     Boolean,
     Null,
     Number
-};
+  };
 
-class JsonValue
-{
-public:
+  class JsonValue
+  {
+  public:
     JsonValue();
     ~JsonValue();
 
@@ -34,19 +35,18 @@ public:
     JsonValue& operator=(const JsonValue& obj);
     void Clear();
 
-public:
+  public:
     std::string m_strValue = "";
     bool m_booleanValue = false;
     double m_numberValue = 0;
     std::nullptr_t m_pointerValue;
     std::unordered_map<std::string, JsonObjectPrivate> m_mapValue;
-};
+  };
 
-// 用于存放JsonObject对象
-class JsonObjectPrivate
-{
-public:
-
+  // 用于存放JsonObject对象
+  class JsonObjectPrivate
+  {
+  public:
     JsonObjectPrivate();
     ~JsonObjectPrivate();
 
@@ -72,14 +72,15 @@ public:
     // 获取存储的值
     JsonValue& GetValue() const;
     void SetValue(JsonValue& value);
-private:
-    JsonValue* m_jsonObject = nullptr; // 存储实际的值
-    EM_JsonValue m_valueType = EM_JsonValue::Object; // 对JsonValue的标识
-};
 
-class JsonObject
-{
-public:
+  private:
+    JsonValue* m_jsonObject = nullptr;               // 存储实际的值
+    EM_JsonValue m_valueType = EM_JsonValue::Object; // 对JsonValue的标识
+  };
+
+  class JsonObject
+  {
+  public:
     JsonObject();
     JsonObject(const std::string& filePath, const std::string& fileName); // 从文件中读取转化Json对象
     ~JsonObject();
@@ -89,9 +90,9 @@ public:
     void SetJsonObject(const JsonObject& obj);
     JsonObjectPrivate& GetJsonObject();
 
-private:
+  private:
     std::string m_content;
     JsonObjectPrivate m_obj = JsonObjectPrivate();
-};
+  };
 }
 #endif

@@ -5,7 +5,7 @@
 
 int main()
 {
-    FileSystemTest();
-    JsonObjectTest();
-    return 0;
+  FileSystemTest();
+  JsonObjectTest();
+  return 0;
 }
