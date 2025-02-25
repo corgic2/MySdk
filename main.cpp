@@ -2,10 +2,12 @@
 #include <string>
 #include "FileSystem/FileSystemTest.h"
 #include "JsonObject/JsonObjectTest.h"
-
+#include "DesignPattern/SinglePattern.h"
 int main()
 {
-  FileSystemTest();
-  JsonObjectTest();
+  //FileSystemTest();
+  //JsonObjectTest();
+
+	SinglePatternClass::getinstance().print();
   return 0;
 }
