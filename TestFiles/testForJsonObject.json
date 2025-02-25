@@ -1,0 +1,54 @@
+﻿{
+  "基本数据类型": {
+    "string": "Hello, 世界!",
+    "number": 42,
+    "float": 3.1415926,
+    "boolean_true": true,
+    "boolean_false": false,
+    "null_value": null
+  },
+  "复合结构": {
+    "空对象": {},
+    "空数组": [],
+    "简单数组": [1, 2, 3],
+    "混合类型数组": [1, "two", false, null, { "key": "value" }],
+    "嵌套对象": {
+      "layer1": {
+        "layer2": {
+          "layer3": {
+            "final_value": "深度嵌套测试"
+          }
+        }
+      }
+    }
+  },
+  "特殊字符测试": {
+    "引号测试": "She said: \"Hello World!\"",
+    "转义字符": "换行\\n制表符\\t反斜杠\\\\",
+    "特殊符号": "~!@#$%^&*()_+`-={}|[]\\:;'<>?,./",
+    "unicode字符": "\u0041\u4E2D\u6587"
+  },
+  "边界情况": {
+    "极大数": 1.7976931348623157e+308,
+    "极小数": 5e-324,
+    "长字符串": "Lorem ipsum dolor sit amet...（此处可填充长文本）",
+    "日期格式": "2023-12-31T23:59:59.999Z"
+  },
+  "复杂案例": [
+    {
+      "id": 1,
+      "name": "Alice",
+      "active": true,
+      "contact": {
+        "email": "alice@example.com",
+        "phones": ["+86-13800138000", "010-12345678"]
+      }
+    },
+    {
+      "id": 2,
+      "name": "Bob",
+      "active": false,
+      "contact": null
+    }
+  ]
+}

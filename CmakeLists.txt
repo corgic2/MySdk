@@ -24,30 +24,51 @@ else()
 endif()
 message(STATUS "PLATFORM_CPU: ${PLATFORM_CPU}")
 
+
+# 添加VS过滤器
+macro(source_group_by_dir source_files)
+    if(MSVC)
+        set(cur_dir ${CMAKE_CURRENT_SOURCE_DIR})
+        foreach(file ${${source_files}})
+            string(REGEX REPLACE ${cur_dir}/\(.*\) \\1 file_path ${file})
+            string(REGEX REPLACE "\(.*\)/.*" \\1 sgbd_group_name ${file_path})
+            string(COMPARE EQUAL ${file_path} ${sgbd_group_name} nogroup)
+            string(REPLACE "/" "\\" sgbd_group_name ${sgbd_group_name})
+            get_filename_component(file_extension ${file} EXT)
+            if(file_extension STREQUAL ".ui")                   # ui文件，放Form Files
+                source_group("Form Files" FILES ${file})
+            elseif(file_extension STREQUAL ".qrc")
+                source_group("Resource Files" FILES ${file})    # qrc文件，放Resource Files
+				elseif(file_extension STREQUAL ".ts")
+                source_group("Language" FILES ${file})    # qrc文件，放Language
+            elseif(NOT nogroup)
+                source_group(${sgbd_group_name} FILES ${file})  # 使用所在子目录名作为过滤器名
+            endif()
+        endforeach(file)
+    endif(MSVC)
+endmacro(source_group_by_dir)
+
 # 设置输出路径
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_CPU})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_CPU})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_CPU})
 
-# 收集头文件（排除特定目录）
-file(GLOB_RECURSE HEADER_FILES "*.h")
-list(FILTER HEADER_FILES EXCLUDE REGEX "include/.*\\.h$")
+# 所有源文件
+file(GLOB_RECURSE SRC_FILE "*.cpp" "*.cxx" "*.cc" "*.C" "*.c++" "*.h" "*.hpp" "*.H" "*.hxx" "*.ui" "*.qrc" "*.ts")
 
-# 收集源文件
-aux_source_directory(. DIR_SRCS)
-aux_source_directory(FileSystem DIR_SRCS)
-aux_source_directory(JsonObject DIR_SRCS)
-aux_source_directory(INIParseObject DIR_SRCS)
-aux_source_directory(SDKCommonDefine DIR_SRCS)
+# 排除生成的moc、qrc和ui文件
+foreach(file ${SRC_FILE})
+    list(APPEND TARGET_SRC ${file})
+endforeach(file ${SRC_FILE})
+list(FILTER TARGET_SRC EXCLUDE REGEX "moc_|qrc_|ui_")
+list(FILTER TARGET_SRC EXCLUDE REGEX "build/*")
+
+# 添加VS过滤器
+source_group_by_dir(TARGET_SRC)
 
 # 添加可执行文件
-add_executable(${TARGET_NAME} ${HEADER_FILES} ${DIR_SRCS})
+add_executable(${TARGET_NAME} ${TARGET_SRC})
 
 # 包含目录
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
-# 添加子模块
-add_subdirectory(FileSystem)
-add_subdirectory(JsonObject)
-add_subdirectory(INIParseObject)
-add_subdirectory(SDKCommonDefine)

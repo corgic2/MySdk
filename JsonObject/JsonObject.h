@@ -36,7 +36,7 @@ namespace my_sdk
     void Clear();
 
   public:
-    std::string m_strValue = "";
+    std::string m_strValue;
     bool m_booleanValue = false;
     double m_numberValue = 0;
     std::nullptr_t m_pointerValue;
@@ -71,7 +71,7 @@ namespace my_sdk
 
     // 获取存储的值
     JsonValue& GetValue() const;
-    void SetValue(JsonValue& value);
+    void SetValue(const JsonValue& value);
 
   private:
     JsonValue* m_jsonObject = nullptr;               // 存储实际的值

@@ -61,7 +61,7 @@ my_sdk::JsonObjectPrivate& my_sdk::JsonObjectPrivate::operator=(const JsonObject
 {
   if (this != &jsonObj)
   {
-    SAFE_DELETE_POINTER_VALUE(m_jsonObject);
+    SAFE_DELETE_POINTER_VALUE(m_jsonObject)
     m_jsonObject = new JsonValue(*jsonObj.m_jsonObject);
     m_valueType = jsonObj.m_valueType;
   }
@@ -263,7 +263,7 @@ my_sdk::JsonObjectPrivate& my_sdk::JsonObjectPrivate::GetJsonObj(const std::stri
   }
   else
   {
-    return JsonObjectPrivate();
+      return JsonObjectPrivate();
   }
 }
 
@@ -308,7 +308,7 @@ my_sdk::JsonValue& my_sdk::JsonObjectPrivate::GetValue() const
   }
 }
 
-void my_sdk::JsonObjectPrivate::SetValue(JsonValue& value)
+void my_sdk::JsonObjectPrivate::SetValue(const JsonValue& value)
 {
   SAFE_DELETE_POINTER_VALUE(m_jsonObject)
   m_jsonObject = new JsonValue(value);

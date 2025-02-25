@@ -7,9 +7,9 @@ using namespace my_sdk;
 void FileSystemTest()
 {
   // 测试路径和文件名
-  std::string testDir = "E:/lf_documents/lf_project/E__WorkSpace/MyQtWorkSpace/sdk"; // 测试目录
-  std::string testFile = "test.txt";                                                 // 测试文件名
-  std::string testContent = "Hello, FileSystem!";                                    // 测试内容
+  std::string testDir = "../TestFiles"; // 测试目录
+  std::string testFile = "testForFileSystem.txt";                                                 // 测试文件名
+  std::string testContent = "你好，我的测试SDK文件系统";                                    // 测试内容
   // 1. 创建测试目录
   std::string testPath = FileSystemUtils::CombinePath(testDir, testFile);
   std::cout << "File created successfully." << std::endl;

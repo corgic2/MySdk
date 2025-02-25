@@ -30,7 +30,8 @@ namespace my_sdk
 
   bool FileSystem::WriteStringToFile(const std::string& filePath, const std::string& fileName, const std::string& str)
   {
-    std::ofstream file(FileSystemUtils::CombinePath(filePath, fileName));
+      //采用二进制读写确保数据没有问题 + 优化读取速率
+    std::ofstream file(FileSystemUtils::CombinePath(filePath, fileName), std::ios::binary);
     // 文件流没有被打开
 
     if (!file.is_open())
@@ -39,6 +40,8 @@ namespace my_sdk
     }
 
     // 写入
+    const unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
+    file.write(reinterpret_cast<const char*>(bom), 3);
     file << str;
     file.close();
     return true;
@@ -46,11 +49,25 @@ namespace my_sdk
 
   void FileSystem::ReadStringFromFile(const std::string& filePath, const std::string& fileName, std::string& outData)
   {
-    std::ifstream file(FileSystemUtils::CombinePath(filePath, fileName));
+      //采用二进制读写确保数据没有问题 + 优化读取速率
+    std::ifstream file(FileSystemUtils::CombinePath(filePath, fileName), std::ios::binary);
 
     if (!file.is_open())
     {
       return;
+    }
+
+    // 检测BOM
+    char bom[3];
+    file.read(bom, 3);
+    if (file.gcount() == 3 &&
+        static_cast<unsigned char>(bom[0]) == 0xEF &&
+        static_cast<unsigned char>(bom[1]) == 0xBB &&
+        static_cast<unsigned char>(bom[2]) == 0xBF) {
+        // 跳过BOM
+    }
+    else {
+        file.seekg(0); // 无BOM则重置指针
     }
 
     outData.assign((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
