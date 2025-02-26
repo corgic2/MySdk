@@ -22,7 +22,8 @@ namespace my_sdk
     String,
     Boolean,
     Null,
-    Number
+    Number,
+    Error
   };
 
   class JsonValue
@@ -63,7 +64,7 @@ namespace my_sdk
     EM_JsonValue GetValueType() const;
 
     //根据当前层的Key，SetAndGet JsonObjPrivate对象
-    JsonObjectPrivate& GetJsonObj(const std::string& key) const;
+    my_sdk::JsonObjectPrivate GetJsonObj(const std::string& key) const;
     void SetJsonObjValue(const std::string& key, const JsonObjectPrivate& jsonObject);
 
     //添加Json对象
