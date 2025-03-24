@@ -1,51 +1,11 @@
 ﻿#include "JsonObject.h"
-
+#include "JsonObjectPrivate.h"
 #include <filesystem>
 #include "../SDKCommonDefine/SDKCommonDefine.h"
 
-my_sdk::JsonValue::JsonValue()
-{
-}
-
-my_sdk::JsonValue::~JsonValue()
-{
-}
-
-my_sdk::JsonValue::JsonValue(const JsonValue& obj)
-{
-    *this = obj;
-}
-
-my_sdk::JsonValue& my_sdk::JsonValue::operator=(const JsonValue& obj)
-{
-    if (this != &obj)
-    {
-        Clear();
-        m_strValue = obj.m_strValue;
-        m_booleanValue = obj.m_booleanValue;
-        m_numberValue = obj.m_numberValue;
-        m_pointerValue = obj.m_pointerValue;
-
-        for (auto i = m_mapValue.begin(); i != m_mapValue.end(); ++i)
-        {
-            m_mapValue[i->first] = i->second;
-        }
-    }
-
-    return *this;
-}
-
-void my_sdk::JsonValue::Clear()
-{
-    m_strValue = "";
-    m_booleanValue = false;
-    m_numberValue = 0.0;
-    m_mapValue.clear();
-}
-
 my_sdk::JsonObjectPrivate::JsonObjectPrivate()
 {
-    SetValueType(Object);
+    SetValueType(JsonValue::EM_JsonValue::Object);
 }
 
 my_sdk::JsonObjectPrivate::~JsonObjectPrivate()
@@ -62,9 +22,9 @@ my_sdk::JsonObjectPrivate& my_sdk::JsonObjectPrivate::operator=(const JsonObject
 {
     if (this != &jsonObj)
     {
-        SAFE_DELETE_POINTER_VALUE(m_jsonObject)
         m_jsonObject = new JsonValue(*jsonObj.m_jsonObject);
-        m_valueType = jsonObj.m_valueType;
+        SAFE_DELETE_POINTER_VALUE(m_jsonObject)
+            m_valueType = jsonObj.m_valueType;
     }
 
     return *this;
@@ -73,7 +33,7 @@ my_sdk::JsonObjectPrivate& my_sdk::JsonObjectPrivate::operator=(const JsonObject
 my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseObject(const std::string& content, size_t& index)
 {
     JsonObjectPrivate result;
-    result.SetValueType(EM_JsonValue::Object);
+    result.SetValueType(JsonValue::EM_JsonValue::Object);
 
     while (index < content.size())
     {
@@ -125,7 +85,7 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseObject(const std::stri
 my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseArray(const std::string& content, size_t& index)
 {
     JsonObjectPrivate result;
-    result.SetValueType(EM_JsonValue::Array);
+    result.SetValueType(JsonValue::EM_JsonValue::Array);
 
     while (index < content.size())
     {
@@ -182,7 +142,7 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseValue(const std::strin
             }
 
             result.GetValue().m_strValue = content.substr(start, index - start);
-            result.SetValueType(EM_JsonValue::String);
+            result.SetValueType(JsonValue::EM_JsonValue::String);
             ++index; // 跳过结束的 '"'
             break;
         }
@@ -200,7 +160,7 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseValue(const std::strin
                 index += 5;
             }
 
-            result.SetValueType(EM_JsonValue::Boolean);
+            result.SetValueType(JsonValue::EM_JsonValue::Boolean);
             break;
         }
         else if (ch == 'n')
@@ -212,7 +172,7 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseValue(const std::strin
                 index += 4;
             }
 
-            result.SetValueType(EM_JsonValue::Null);
+            result.SetValueType(JsonValue::EM_JsonValue::Null);
             break;
         }
         else if (ch == '-' || (ch >= '0' && ch <= '9'))
@@ -221,13 +181,13 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseValue(const std::strin
             size_t start = index;
 
             while (index < content.size() && (content[index] == '-' || content[index] == '.' || (
-                                                  content[index] >= '0' && content[index] <= '9')))
+                content[index] >= '0' && content[index] <= '9')))
             {
                 ++index;
             }
 
             result.GetValue().m_numberValue = std::stod(content.substr(start, index - start));
-            result.SetValueType(EM_JsonValue::Number);
+            result.SetValueType(JsonValue::EM_JsonValue::Number);
             break;
         }
         else
@@ -239,19 +199,19 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseValue(const std::strin
     return result;
 }
 
-void my_sdk::JsonObjectPrivate::SetValueType(const EM_JsonValue& enumValue)
+void my_sdk::JsonObjectPrivate::SetValueType(const JsonValue::EM_JsonValue& enumValue)
 {
     m_valueType = enumValue;
 }
 
-my_sdk::EM_JsonValue my_sdk::JsonObjectPrivate::GetValueType() const
+my_sdk::JsonValue::EM_JsonValue my_sdk::JsonObjectPrivate::GetValueType() const
 {
     return m_valueType;
 }
 
 my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::GetJsonObj(const std::string& key) const
 {
-    if (m_valueType != Object || !m_jsonObject)
+    if (m_valueType != JsonValue::EM_JsonValue::Object || !m_jsonObject)
     {
         return JsonObjectPrivate();
     }
@@ -267,7 +227,7 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::GetJsonObj(const std::strin
 
 void my_sdk::JsonObjectPrivate::SetJsonObjValue(const std::string& key, const JsonObjectPrivate& jsonObject)
 {
-    if (m_valueType != Object || !m_jsonObject)
+    if (m_valueType != JsonValue::EM_JsonValue::Object || !m_jsonObject)
     {
         return;
     }
@@ -281,7 +241,7 @@ void my_sdk::JsonObjectPrivate::SetJsonObjValue(const std::string& key, const Js
 
 void my_sdk::JsonObjectPrivate::AddJsonObj(const std::string& key, const JsonObjectPrivate& jsonObject)
 {
-    if (m_valueType != Object || !m_jsonObject)
+    if (m_valueType != JsonValue::EM_JsonValue::Object || !m_jsonObject)
     {
         return;
     }
@@ -306,7 +266,7 @@ my_sdk::JsonValue& my_sdk::JsonObjectPrivate::GetValue() const
 void my_sdk::JsonObjectPrivate::SetValue(const JsonValue& value)
 {
     SAFE_DELETE_POINTER_VALUE(m_jsonObject)
-    m_jsonObject = new JsonValue(value);
+        m_jsonObject = new JsonValue(value);
 }
 
 my_sdk::JsonObject::JsonObject()

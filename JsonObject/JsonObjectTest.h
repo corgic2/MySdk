@@ -6,5 +6,4 @@ using namespace my_sdk;
 void JsonObjectTest()
 {
     my_sdk::JsonObject jsonObj("../TestFiles", "testForJsonObject.json");
-    my_sdk::JsonObjectPrivate& obj = jsonObj.GetJsonObject();
 }
