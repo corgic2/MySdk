@@ -7,7 +7,7 @@
 // ************************************************************
 #pragma once
 #include <string>
-
+#pragma execution_character_set("utf-8")
 namespace my_sdk
 {
   class FileSystemUtils

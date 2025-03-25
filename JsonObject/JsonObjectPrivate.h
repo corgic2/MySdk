@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include <unordered_map>
+#include <vector>
 #include "JsonValue.h"
 namespace my_sdk
 {
@@ -37,13 +39,16 @@ namespace my_sdk
         JsonValue& GetValue();
 
         // 当为Array时
-        void AddArrayValue(const JsonValue& value);
-        std::vector<JsonValue>& GetJsonArrayValue();
+        void AddArrayValue(const JsonObjectPrivate& value);
+        std::vector<my_sdk::JsonObjectPrivate>& GetJsonArrayValue();
+
+        bool IsValueBegin(const char& str);
+        void SkipBlank(const std::string& content, size_t& index);
 
     private:
         JsonValue::EM_JsonValue m_valueType = JsonValue::EM_JsonValue::Object;                                              // 对JsonValue的标识
         std::unordered_map<std::string, JsonObjectPrivate> m_object = std::unordered_map<std::string, JsonObjectPrivate>(); // 当为Object时，采用这个值
         JsonValue m_Jsonvalue;                                                                                              // 当为Value时采用这个值
-        std::vector<JsonValue> m_JsonValueArray;                                                                            //当为Array时，采用这个值
+        std::vector<JsonObjectPrivate> m_JsonValueArray;                                                                    //当为Array时，采用这个值
     };
 }

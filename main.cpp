@@ -12,5 +12,5 @@ int main()
     //std::string value = my_utils::MyUtils::getinstance()->AddBigInterNumber("12312453152344523452346234623452", "43252346234985798465238497");
     //std::cout << value << std::endl;
     //SinglePatternClass::getinstance()->print();0
-  return 0;
+    return 0;
 }

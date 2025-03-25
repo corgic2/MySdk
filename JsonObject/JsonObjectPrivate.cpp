@@ -21,8 +21,10 @@ my_sdk::JsonObjectPrivate& my_sdk::JsonObjectPrivate::operator=(const JsonObject
 {
     if (this != &jsonObj)
     {
-        m_object = jsonObj.GetCurJsonObject();
+        m_object = jsonObj.m_object;
         m_valueType = jsonObj.m_valueType;
+        m_JsonValueArray = jsonObj.m_JsonValueArray;
+        m_Jsonvalue = jsonObj.m_Jsonvalue;
     }
 
     return *this;
@@ -58,30 +60,29 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseObject(const std::stri
 
             ++index; //跳过 :
 
-            //跳过空格
-            while (content[index] == ' ' || content[index] == '\n' || content[index] == '\t')
-            {
-                ++index;
-            }
+            SkipBlank(content, index);
 
+            JsonObjectPrivate value;
             if (content[index] == '{')
             {
-                AddJsonObj(key, ParseObject(content, index));
+                value.ParseObject(content, index);
+                AddJsonObj(key, value);
             }
             else if (content[index] == '[')
             {
-                AddJsonObj(key, ParseArray(content, index));
+                value = ParseArray(content, index);
+                AddJsonObj(key, value);
             }
-            else if (content[index] == '"'
-                || ((content[index] - '0') >= 0 && (content[index] - '0') <= 9)
-                || content[index] == 't' || content[index] == 'f' || content[index] == 'n')
+            else if (IsValueBegin(content[index]))
             {
-                AddJsonObj(key, ParseValue(content, index));
+                value = ParseValue(content, index);
+                AddJsonObj(key, value);
             }
             else
             {
                 std::cout << "error JsonObject" << std::endl;
             }
+            key.clear();
         }
     }
     return *this;
@@ -89,10 +90,33 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseObject(const std::stri
 
 my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseArray(const std::string& content, size_t& index)
 {
+    JsonObjectPrivate result;
+    result.SetValueType(JsonValue::EM_JsonValue::Array);
     if (content[index] == '[')
     {
+        ++index;
+        JsonObjectPrivate value;
+        if (IsValueBegin(content[index]))
+        {
+            value = ParseValue(content, index);
+            result.AddArrayValue(value);
+        }
+        else if (content[index] == '[')
+        {
+            value.ParseArray(content, index);
+            result.AddArrayValue(value);
+        }
+        else if (content[index] == '{')
+        {
+            value.ParseObject(content, index);
+            result.AddArrayValue(value);
+        }
+        else
+        {
+            result.SetValueType(JsonValue::EM_JsonValue::Error);
+        }
     }
-    return *this;
+    return result;
 }
 
 my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseValue(const std::string& content, size_t& index)
@@ -101,6 +125,10 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseValue(const std::strin
     JsonObjectPrivate result;
     while (index < content.size())
     {
+        if (content[index] == ',' || content[index] == '}' || content[index] == ']')
+        {
+            break;
+        }
         //string
         if (content[index] == '"')
         {
@@ -113,11 +141,98 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseValue(const std::strin
             }
             value.SetStrValue(str);
             result.SetValue(value);
+            ++index;
+            SkipBlank(content, index);
         }
         //number
         else if (bNumber >= 0 && bNumber <= 9)
         {
             result.SetValueType(JsonValue::EM_JsonValue::Number);
+            std::string numberStr;
+            bool hasDecimal = false;  // 是否包含小数点
+            bool hasExponent = false; // 是否包含指数
+
+            // 允许负号开头
+            if (content[index] == '-')
+            {
+                numberStr += content[index++];
+            }
+
+            while (index < content.size())
+            {
+                const char c = content[index];
+
+                // 检查数字组成部分
+                if (isdigit(c))
+                {
+                    numberStr += c;
+                    ++index;
+                }
+                // 处理小数点
+                else if (c == '.' && !hasDecimal && !hasExponent)
+                {
+                    if (numberStr.empty() || (!isdigit(numberStr.back()) && numberStr.back() != '-'))
+                    {
+                        result.SetValueType(JsonValue::EM_JsonValue::Error);
+                        break;
+                    }
+                    numberStr += c;
+                    hasDecimal = true;
+                    ++index;
+                }
+                // 处理科学计数法
+                else if ((c == 'e' || c == 'E') && !hasExponent)
+                {
+                    if (numberStr.empty() || (!isdigit(numberStr.back()) && numberStr.back() != '.'))
+                    {
+                        result.SetValueType(JsonValue::EM_JsonValue::Error);
+                        break;
+                    }
+                    numberStr += c;
+                    hasExponent = true;
+                    ++index;
+
+                    // 处理指数符号
+                    if (index < content.size() && (content[index] == '+' || content[index] == '-'))
+                    {
+                        numberStr += content[index++];
+                    }
+                }
+                // 结束条件：遇到非数字成分
+                else if (c == ',' || c == '}' || c == ']' || isspace(c))
+                {
+                    break;
+                }
+                else
+                {
+                    result.SetValueType(JsonValue::EM_JsonValue::Error);
+                    break;
+                }
+            }
+
+            // 验证最终格式
+            if (numberStr.empty() ||
+                numberStr == "-" ||
+                numberStr.back() == '.' ||
+                numberStr.find('e') == numberStr.size() - 1 ||
+                numberStr.find('E') == numberStr.size() - 1)
+            {
+                result.SetValueType(JsonValue::EM_JsonValue::Error);
+            }
+            else
+            {
+                JsonValue value;
+                if (hasDecimal || hasExponent)
+                {
+                    value.SetDoubleValue(strtod(numberStr.c_str(), nullptr));
+                }
+                else
+                {
+                    value.SetIntValue(strtoll(numberStr.c_str(), nullptr, 10));
+                }
+                result.SetValue(value);
+            }
+            SkipBlank(content, index);
         }
         //boolean
         else if (content[index] == 'f' || content[index] == 't')
@@ -129,10 +244,12 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseValue(const std::strin
                 if (content[index] == 'f')
                 {
                     value.SetStrValue("false");
+                    index += 5;
                 }
                 else
                 {
                     value.SetStrValue("true");
+                    index += 4;
                 }
                 result.SetValue(value);
             }
@@ -140,6 +257,7 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseValue(const std::strin
             {
                 result.SetValueType(JsonValue::EM_JsonValue::Error);
             }
+            SkipBlank(content, index);
         }
         //null
         else if (content[index] == 'n')
@@ -149,11 +267,13 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseValue(const std::strin
                 JsonValue value;
                 value.SetStrValue("null");
                 result.SetValueType(JsonValue::EM_JsonValue::Null);
+                index += 4;
             }
             else
             {
                 result.SetValueType(JsonValue::EM_JsonValue::Error);
             }
+            SkipBlank(content, index);
         }
         //error
         else
@@ -161,6 +281,7 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseValue(const std::strin
             result.SetValueType(JsonValue::EM_JsonValue::Error);
         }
     }
+
     return result;
 }
 
@@ -204,12 +325,31 @@ my_sdk::JsonValue& my_sdk::JsonObjectPrivate::GetValue()
     return m_Jsonvalue;
 }
 
-void my_sdk::JsonObjectPrivate::AddArrayValue(const JsonValue& value)
+void my_sdk::JsonObjectPrivate::AddArrayValue(const JsonObjectPrivate& value)
 {
     m_JsonValueArray.push_back(value);
 }
 
-std::vector<my_sdk::JsonValue>& my_sdk::JsonObjectPrivate::GetJsonArrayValue()
+std::vector<my_sdk::JsonObjectPrivate>& my_sdk::JsonObjectPrivate::GetJsonArrayValue()
 {
     return m_JsonValueArray;
+}
+
+bool my_sdk::JsonObjectPrivate::IsValueBegin(const char& str)
+{
+    if (str == '"' || isdigit(str) || str == '-' || str == 't' || str == 'f' || str == 'n')
+    {
+        return true;
+    }
+
+    return false;
+}
+
+void my_sdk::JsonObjectPrivate::SkipBlank(const std::string& content, size_t& index)
+{
+    //跳过空格
+    while (content[index] == ' ' || content[index] == '\n' || content[index] == '\t' || content[index] == '\r')
+    {
+        ++index;
+    }
 }
