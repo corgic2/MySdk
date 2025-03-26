@@ -33,13 +33,18 @@ my_sdk::JsonObjectPrivate& my_sdk::JsonObjectPrivate::operator=(const JsonObject
 my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseObject(const std::string& content, size_t& index)
 {
     std::string key;
+    JsonObjectPrivate result;
     while (index < content.size())
     {
         // "123" : "1234"
         // "123" : false
         // "123" : [ "1234" : "11" ]
         // "123" : { "123" : "123" }
-
+        if (content[index] == '}')
+        {
+            ++index;
+            break;
+        }
         if (content[index] != '"')
         {
             ++index;
@@ -62,21 +67,17 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseObject(const std::stri
 
             SkipBlank(content, index);
 
-            JsonObjectPrivate value;
             if (content[index] == '{')
             {
-                value.ParseObject(content, index);
-                AddJsonObj(key, value);
+                result.AddJsonObj(key, ParseObject(content, index));
             }
             else if (content[index] == '[')
             {
-                value = ParseArray(content, index);
-                AddJsonObj(key, value);
+                result.AddJsonObj(key, ParseArray(content, index));
             }
             else if (IsValueBegin(content[index]))
             {
-                value = ParseValue(content, index);
-                AddJsonObj(key, value);
+                result.AddJsonObj(key, ParseValue(content, index));
             }
             else
             {
@@ -85,7 +86,7 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseObject(const std::stri
             key.clear();
         }
     }
-    return *this;
+    return result;
 }
 
 my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseArray(const std::string& content, size_t& index)
@@ -94,26 +95,33 @@ my_sdk::JsonObjectPrivate my_sdk::JsonObjectPrivate::ParseArray(const std::strin
     result.SetValueType(JsonValue::EM_JsonValue::Array);
     if (content[index] == '[')
     {
-        ++index;
-        JsonObjectPrivate value;
-        if (IsValueBegin(content[index]))
+        while (index < content.size())
         {
-            value = ParseValue(content, index);
-            result.AddArrayValue(value);
-        }
-        else if (content[index] == '[')
-        {
-            value.ParseArray(content, index);
-            result.AddArrayValue(value);
-        }
-        else if (content[index] == '{')
-        {
-            value.ParseObject(content, index);
-            result.AddArrayValue(value);
-        }
-        else
-        {
-            result.SetValueType(JsonValue::EM_JsonValue::Error);
+            if (content[index] == ']')
+            {
+                break;
+            }
+            ++index;
+            JsonObjectPrivate value;
+            if (IsValueBegin(content[index]))
+            {
+                value = ParseValue(content, index);
+                result.AddArrayValue(value);
+            }
+            else if (content[index] == '[')
+            {
+                value = value.ParseArray(content, index);
+                result.AddArrayValue(value);
+            }
+            else if (content[index] == '{')
+            {
+                value = value.ParseObject(content, index);
+                result.AddArrayValue(value);
+            }
+            else
+            {
+                result.SetValueType(JsonValue::EM_JsonValue::Error);
+            }
         }
     }
     return result;
