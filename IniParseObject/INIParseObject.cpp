@@ -1,6 +1,6 @@
 #include "../IniParseObject/INIParseObject.h"
 // ¸¨Öúº¯Êý£ºÈ¥³ý×Ö·û´®Á½¶ËµÄ¿Õ°××Ö·û
-std::string my_sdk::INIParseObject::Trim(const std::string& str)
+std::string my_sdk::INIParseObject::Trim(const std::string &str)
 {
     size_t first = str.find_first_not_of(" \t\n\r\f\v");
     if (first == std::string::npos)
@@ -11,12 +11,12 @@ std::string my_sdk::INIParseObject::Trim(const std::string& str)
     return str.substr(first, (last - first + 1));
 }
 
-bool my_sdk::INIParseObject::IsComment(const std::string& line)
+bool my_sdk::INIParseObject::IsComment(const std::string &line)
 {
     return line.empty() || line[0] == ';' || line[0] == '#';
 }
 
-bool my_sdk::INIParseObject::Load(const std::string& filePath)
+bool my_sdk::INIParseObject::Load(const std::string &filePath)
 {
     std::ifstream file(filePath);
     if (!file.is_open())
@@ -57,7 +57,7 @@ bool my_sdk::INIParseObject::Load(const std::string& filePath)
     return true;
 }
 
-std::unordered_map<std::string, std::string> my_sdk::INIParseObject::GetSection(const std::string& sectionName) const
+std::unordered_map<std::string, std::string> my_sdk::INIParseObject::GetSection(const std::string &sectionName) const
 {
     auto it = sections.find(sectionName);
     if (it != sections.end())
@@ -67,7 +67,7 @@ std::unordered_map<std::string, std::string> my_sdk::INIParseObject::GetSection(
     return {};
 }
 
-std::string my_sdk::INIParseObject::GetValue(const std::string& sectionName, const std::string& keyName) const
+std::string my_sdk::INIParseObject::GetValue(const std::string &sectionName, const std::string &keyName) const
 {
     auto sectionIt = sections.find(sectionName);
     if (sectionIt != sections.end())
@@ -83,10 +83,10 @@ std::string my_sdk::INIParseObject::GetValue(const std::string& sectionName, con
 
 void my_sdk::INIParseObject::PrintAll() const
 {
-    for (const auto& section : sections)
+    for (const auto &section : sections)
     {
         std::cout << "[" << section.first << "]" << std::endl;
-        for (const auto& keyValue : section.second)
+        for (const auto &keyValue : section.second)
         {
             std::cout << keyValue.first << " = " << keyValue.second << std::endl;
         }

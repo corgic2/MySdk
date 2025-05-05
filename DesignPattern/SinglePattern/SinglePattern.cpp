@@ -1,3 +1,3 @@
-#include "SinglePattern.h"
+﻿#include "SinglePattern.h"
 
-SinglePatternClass* SinglePatternClass::m_obj = nullptr;
+SinglePatternClass *SinglePatternClass::m_obj = nullptr;

@@ -1,5 +1,5 @@
-# 指定CMake的最低版本
-cmake_minimum_required(VERSION 3.10)
+﻿# 指定CMake的最低版本
+cmake_minimum_required(VERSION 3.28)
 
 # 设置项目名称
 project(SDK)
@@ -10,8 +10,9 @@ set(TARGET_NAME SDK)
 # 设置启动项目
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT SDK)
 
-# 启用C++17
-add_compile_options(-std=c++17)
+set(CMAKE_CXX_STANDARD 20)          # 强制要求 C++20
+set(CMAKE_CXX_STANDARD_REQUIRED ON) # 必须满足标准
+set(CMAKE_CXX_EXTENSIONS OFF)       # 禁用编译器扩展
 
 # 解决节数超过对象文件格式限制
 add_compile_options(-bigobj)
