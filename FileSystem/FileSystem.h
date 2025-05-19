@@ -7,13 +7,12 @@
 // ************************************************************
 #pragma once
 #include <string>
-#pragma execution_character_set("utf-8")
+#include <boost/filesystem/path.hpp>
+
 namespace my_sdk
 {
   class FileSystemUtils
   {
-  public:
-    static std::string CombinePath(const std::string& path1, const std::string& path2);
   };
 
 
@@ -22,10 +21,21 @@ namespace my_sdk
   public:
     FileSystem();
     ~FileSystem();
+
     // 读写文件
-    static bool WriteStringToFile(const std::string& filePath, const std::string& fileName, const std::string& str);
+    static bool WriteStringToFile(const boost::filesystem::path& filePath, const std::string& str, bool writeBom = false);
+
     // 写入内容str至路径filePath下文件名fileName的文件
-    static void ReadStringFromFile(const std::string& filePath, const std::string& fileName, std::string& outData);
-    // 读取路径filePath下文件名为filename的文件内容
+    static std::string ReadStringFromFile(const boost::filesystem::path& filePath, bool removeBOM = true);
+
+    static std::string ConvertEncodingToUtf_8(const std::string& input, const std::string& to = "UTF-8");
+
+    //列出次目录下所有的文件
+    static void ListDirectory(const boost::filesystem::path& dir);
+
+private:
+
+    // 获取目录下所有文件的路径
+    std::vector<boost::filesystem::path> Getfiles(const boost::filesystem::path& dir);
   };
 }

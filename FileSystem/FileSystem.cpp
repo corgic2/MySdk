@@ -1,11 +1,7 @@
 ﻿#include "FileSystem.h"
-#include <algorithm>
-#include <cstdlib>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <windows.h>
-
+#include <boost/filesystem.hpp>
 namespace my_sdk
 {
     FileSystem::FileSystem()
@@ -16,63 +12,90 @@ namespace my_sdk
     {
     }
 
-    std::string FileSystemUtils::CombinePath(const std::string& path1, const std::string& path2)
+    bool FileSystem::WriteStringToFile(const boost::filesystem::path& filePath, const std::string& str, bool writeBom)
     {
-        // 创建 path1 和 path2 的拷贝，以避免修改原始输入
-        std::string path1Copy = path1;
-        std::string path2Copy = path2;
-        // 替换正斜杠为反斜杠
-        std::replace(path1Copy.begin(), path1Copy.end(), '/', '\\');
-        std::replace(path2Copy.begin(), path2Copy.end(), '/', '\\');
-        // 拼接路径
-        return path1Copy + "\\" + path2Copy;
-    }
+        // 确保父目录存在
+        boost::filesystem::create_directories(filePath.parent_path());
 
-    bool FileSystem::WriteStringToFile(const std::string& filePath, const std::string& fileName, const std::string& str)
-    {
-        //采用二进制读写确保数据没有问题 + 优化读取速率
-        std::ofstream file(FileSystemUtils::CombinePath(filePath, fileName), std::ios::binary);
-        // 文件流没有被打开
-
+        // 写入内容
+        std::ofstream file(filePath.string(), std::ios::binary);
         if (!file.is_open())
         {
             return false;
         }
-
-        // 写入
-        const unsigned char bom[] = { 0xEF, 0xBB, 0xBF };
-        file.write(reinterpret_cast<const char*>(bom), 3);
+        // 可选写入BOM
+        if (writeBom)
+        {
+            const char bom[] = "\xEF\xBB\xBF";
+            file.write(bom, 3);
+        }
         file << str;
         file.close();
+        std::cout << "文件已写入: " << filePath << "\n";
         return true;
     }
 
-    void FileSystem::ReadStringFromFile(const std::string& filePath, const std::string& fileName, std::string& outData)
+    std::string FileSystem::ReadStringFromFile(const boost::filesystem::path& filePath, bool removeBOM)
     {
-        //采用二进制读写确保数据没有问题 + 优化读取速率
-        std::ifstream file(FileSystemUtils::CombinePath(filePath, fileName), std::ios::binary);
+        if (!boost::filesystem::exists(filePath))
+        {
+            return "";
+        }
 
+        std::ifstream file(filePath.string(), std::ios::binary);
         if (!file.is_open())
         {
-            return;
+            return "";
+        }
+        // 读取全部内容到缓冲区
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+        // 安全移除BOM
+        if (removeBOM && content.size() >= 3 && static_cast<uint8_t>(content[0]) == 0xEF && static_cast<uint8_t>(content[1]) == 0xBB && static_cast<uint8_t>(content[2]) == 0xBF)
+        {
+            content.erase(0, 3);
         }
 
-        // 检测BOM
-        char bom[3];
-        file.read(bom, 3);
-        if (file.gcount() == 3 &&
-            static_cast<unsigned char>(bom[0]) == 0xEF &&
-            static_cast<unsigned char>(bom[1]) == 0xBB &&
-            static_cast<unsigned char>(bom[2]) == 0xBF)
+        return content;
+    }
+
+    std::string FileSystem::ConvertEncodingToUtf_8(const std::string& input, const std::string& to)
+    {
+        return input;
+    }
+
+    void FileSystem::ListDirectory(const boost::filesystem::path& dir)
+    {
+        if (!boost::filesystem::exists(dir) || !boost::filesystem::is_directory(dir))
         {
-            // 跳过BOM
-        }
-        else
-        {
-            file.seekg(0); // 无BOM则重置指针
+            throw std::runtime_error("目录无效: " + dir.string());
         }
 
-        outData.assign((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-        file.close();
+        std::cout << "目录内容 (" << dir << "):\n";
+        for (const auto& entry : boost::filesystem::directory_iterator(dir))
+        {
+            const auto& path = entry.path();
+            std::string type = boost::filesystem::is_directory(path) ? "[目录]" : boost::filesystem::is_regular_file(path) ? "[文件]" : "[其他]";
+            std::cout << "  " << type << " " << path.filename() << "\n";
+        }
+    }
+
+    std::vector<boost::filesystem::path> FileSystem::Getfiles(const boost::filesystem::path& dir)
+    {
+        std::vector<boost::filesystem::path> files;
+        if (!boost::filesystem::is_directory(dir))
+        {
+            return files;
+        }
+
+        for (const auto& entry : boost::filesystem::directory_iterator(dir))
+        {
+            if (boost::filesystem::is_regular_file(entry))
+            {
+                files.push_back(entry.path());
+            }
+        }
+
+        return files;
     }
 }

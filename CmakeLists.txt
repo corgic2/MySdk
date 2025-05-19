@@ -73,3 +73,29 @@ add_executable(${TARGET_NAME} ${TARGET_SRC})
 # 包含目录
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
+# 设置Boost库的根目录（应指向 Boost 的安装根目录）
+set(BOOST_ROOT "D:/WorkSpace/boost_1_88_0")
+ 
+# 禁用搜索系统路径
+set(Boost_NO_SYSTEM_PATHS ON) # 非常重要，否则会导致找不到 Boost 库
+ 
+# 查找Boost库，指定需要的组件
+# find_package(Boost REQUIRED COMPONENTS filesystem regex)
+set(SDKThirdPartylib "${CMAKE_SOURCE_DIR}/SDKThirdPartylib.txt")
+file(STRINGS ${SDKThirdPartylib} LIBRARIES)
+find_package(Boost REQUIRED COMPONENTS ${LIBRARIES})
+if(Boost_FOUND)
+    # 输出 Boost 的相关信息
+    message("Boost version: ${Boost_VERSION}")
+    message("Boost_INCLUDE_DIRS: ${Boost_INCLUDE_DIRS}")
+    message("Boost_LIBRARY_DIRS: ${Boost_LIBRARY_DIRS}")
+ 
+    # 链接Boost库目录
+    #link_directories(${Boost_LIBRARY_DIRS})
+	
+    target_include_directories(${TARGET_NAME} PUBLIC ${Boost_INCLUDE_DIRS})
+ 
+    target_link_libraries (${TARGET_NAME} PRIVATE ${Boost_LIBRARIES})
+else()
+    message(FATAL_ERROR "Boost not found!")
+endif()

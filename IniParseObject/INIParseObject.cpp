@@ -1,11 +1,11 @@
-#include "../IniParseObject/INIParseObject.h"
-// ¸¨Öúº¯Êý£ºÈ¥³ý×Ö·û´®Á½¶ËµÄ¿Õ°××Ö·û
+ï»¿#include "../IniParseObject/INIParseObject.h"
+// è¾…åŠ©å‡½æ•°ï¼šåŽ»é™¤å­—ç¬¦ä¸²ä¸¤ç«¯çš„ç©ºç™½å­—ç¬¦
 std::string my_sdk::INIParseObject::Trim(const std::string &str)
 {
     size_t first = str.find_first_not_of(" \t\n\r\f\v");
     if (first == std::string::npos)
     {
-        return ""; // È«ÊÇ¿Õ°××Ö·û
+        return ""; // å…¨æ˜¯ç©ºç™½å­—ç¬¦
     }
     size_t last = str.find_last_not_of(" \t\n\r\f\v");
     return str.substr(first, (last - first + 1));
@@ -32,17 +32,17 @@ bool my_sdk::INIParseObject::Load(const std::string &filePath)
         line = Trim(line);
         if (IsComment(line))
         {
-            continue; // Ìø¹ý×¢ÊÍÐÐ
+            continue; // è·³è¿‡æ³¨é‡Šè¡Œ
         }
 
-        if (line[0] == '[' && line.back() == ']') // Çø¶Î
+        if (line[0] == '[' && line.back() == ']') // åŒºæ®µ
         {
             currentSection = Trim(line.substr(1, line.size() - 2));
             continue;
         }
 
         size_t equalPos = line.find('=');
-        if (equalPos != std::string::npos) // ¼üÖµ¶Ô
+        if (equalPos != std::string::npos) // é”®å€¼å¯¹
         {
             std::string key = Trim(line.substr(0, equalPos));
             std::string value = Trim(line.substr(equalPos + 1));
@@ -78,7 +78,7 @@ std::string my_sdk::INIParseObject::GetValue(const std::string &sectionName, con
             return keyIt->second;
         }
     }
-    return ""; // Î´ÕÒµ½Ê±·µ»Ø¿Õ×Ö·û´®
+    return ""; // æœªæ‰¾åˆ°æ—¶è¿”å›žç©ºå­—ç¬¦ä¸²
 }
 
 void my_sdk::INIParseObject::PrintAll() const

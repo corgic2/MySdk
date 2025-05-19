@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -11,23 +11,23 @@ namespace my_sdk
   class INIParseObject
   {
   public:
-    // ´æ´¢½âÎöºóµÄÊı¾İ
+    // å­˜å‚¨è§£æåçš„æ•°æ®
     std::unordered_map<std::string, std::unordered_map<std::string, std::string>> sections;
-    // ¸¨Öúº¯Êı£ºÈ¥³ı×Ö·û´®Á½¶ËµÄ¿Õ°××Ö·û
+    // è¾…åŠ©å‡½æ•°ï¼šå»é™¤å­—ç¬¦ä¸²ä¸¤ç«¯çš„ç©ºç™½å­—ç¬¦
     std::string Trim(const std::string& str);
-    // ¸¨Öúº¯Êı£ºÅĞ¶ÏÊÇ·ñÊÇ×¢ÊÍĞĞ
+    // è¾…åŠ©å‡½æ•°ï¼šåˆ¤æ–­æ˜¯å¦æ˜¯æ³¨é‡Šè¡Œ
     bool IsComment(const std::string& line);
 
   public:
     INIParseObject() = default;
     ~INIParseObject() = default;
-    // ¼ÓÔØ²¢½âÎöINIÎÄ¼ş
+    // åŠ è½½å¹¶è§£æINIæ–‡ä»¶
     bool Load(const std::string& filePath);
-    // »ñÈ¡Ö¸¶¨Çø¶ÎµÄËùÓĞ¼üÖµ¶Ô
+    // è·å–æŒ‡å®šåŒºæ®µçš„æ‰€æœ‰é”®å€¼å¯¹
     std::unordered_map<std::string, std::string> GetSection(const std::string& sectionName) const;
-    // »ñÈ¡Ö¸¶¨Çø¶ÎµÄÖ¸¶¨¼üµÄÖµ
+    // è·å–æŒ‡å®šåŒºæ®µçš„æŒ‡å®šé”®çš„å€¼
     std::string GetValue(const std::string& sectionName, const std::string& keyName) const;
-    // ´òÓ¡ËùÓĞ½âÎöºóµÄÊı¾İ£¨ÓÃÓÚµ÷ÊÔ£©
+    // æ‰“å°æ‰€æœ‰è§£æåçš„æ•°æ®ï¼ˆç”¨äºè°ƒè¯•ï¼‰
     void PrintAll() const;
   };
 }
