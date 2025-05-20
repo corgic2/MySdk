@@ -7,7 +7,17 @@
 #include <mutex>
 #include <source_location>
 #include <string_view>
+#include "../ThreadPool/ThreadPool.h"
 
+class LogSystemSyncThreadPool
+{
+public:
+    LogSystemSyncThreadPool();
+    ~LogSystemSyncThreadPool();
+
+private:
+    ThreadPool m_threadPool;
+};
 class LogSystem
 {
 private:
@@ -32,7 +42,7 @@ public:
 
     // 核心日志接口
     template <typename... Args>
-    void log(EM_LogLevel level, const std::source_location& loc, std::format_string<Args...> fmt, Args&&... args)
+    void Log(EM_LogLevel level, const std::source_location& loc, std::format_string<Args...> fmt, Args&&... args)
     {
         if (level < m_level.load(std::memory_order_relaxed))
         {
@@ -49,21 +59,20 @@ public:
 #else
         std::string message = std::format("[{}] [{}] {}\n", timestamp, LevelToString(level), std::vformat(fmt.get(), std::make_format_args<std::format_context>(args...)));
 #endif
-        // 线程安全写入
-        write(message);
+        Write(message);
     }
 
     // 配置接口
-    void set_level(EM_LogLevel level) noexcept
+    void SetLevel(EM_LogLevel level) noexcept
     {
         m_level.store(level, std::memory_order_relaxed);
     }
 
-    void set_file(std::string filename);
+    void SetFile(std::string filename);
 
 private:
     // 实现细节
-    void write(std::string_view message);
+    void Write(std::string_view message);
     std::string LevelToString(EM_LogLevel level);
     std::ofstream m_file;
     std::mutex m_mutex;

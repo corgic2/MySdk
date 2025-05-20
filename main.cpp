@@ -6,7 +6,7 @@
 #include "JsonObject/JsonObjectTest.h"
 #include "SDKCommonDefine/SDKUtils.h"
 #include "IniParseObject/IniParseObjectTest.h"
-#include "../LogSystem/LogSystem.h"
+#include "LogSystem/LogSystem.h"
 #include "ThreadPool/ThreadPool.h"
 #pragma execution_character_set("utf-8")
 #define LogSystemTest 0

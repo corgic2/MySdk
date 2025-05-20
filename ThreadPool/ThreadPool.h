@@ -4,6 +4,7 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+#pragma once
 
 class FuncTemplateClass
 {
@@ -131,12 +132,14 @@ private:
 
     void WorkThread();
     int FindLightestQueue();
-
+    bool TrySteal(size_t index);
+    bool WorkThread(size_t index);
+    bool WorkGlobalThread();
 private:
     std::atomic_bool m_globalDone;
     std::queue<FuncTemplateClass> m_workGlobalQueue;
     std::mutex m_globalMutex;
-
+     
     std::vector<ST_localThreadQueue> m_localWorkQueue; // 根据当前线程不同各自拥有一个任务队列，减少全局队列的锁竞争
     static thread_local int m_threadIndex;
 
@@ -145,3 +148,4 @@ private:
 
     std::condition_variable m_condition;
 };
+

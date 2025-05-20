@@ -17,14 +17,14 @@ LogSystem::~LogSystem()
     m_file.close();
 }
 
-void LogSystem::set_file(std::string filename)
+void LogSystem::SetFile(std::string filename)
 {
     m_filePath = filename;
     m_file.open(m_filePath, std::ios::app);
 }
 
 // 文件写入（带异常处理）
-void LogSystem::write(std::string_view message)
+void LogSystem::Write(std::string_view message)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
 
