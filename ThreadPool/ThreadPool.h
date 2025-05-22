@@ -4,6 +4,7 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+#include "../SDKCommonDefine/SDK_Export.h"
 #pragma once
 
 class FuncTemplateClass
@@ -149,3 +150,18 @@ private:
     std::condition_variable m_condition;
 };
 
+class SDK_API GlobalThreadPool
+{
+public:
+    GlobalThreadPool()
+    {
+        m_pool = std::make_unique<ThreadPool>();
+    }
+
+    ~GlobalThreadPool()
+    {
+    }
+
+private:
+    std::unique_ptr<ThreadPool> m_pool = nullptr;
+};

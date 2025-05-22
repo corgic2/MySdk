@@ -1,19 +1,14 @@
 ﻿#pragma once
 #include <string>
+#include "../SDKCommonDefine/SDK_Export.h"
 
 
 namespace my_utils
 {
-    class MyUtils
+    class SDK_API MyUtils
     {
-    private:
+    public:
         MyUtils() = default;
         ~MyUtils();
-
-    public:
-        static MyUtils* getinstance();
-
-    private:
-        static MyUtils* m_obj;
     };
 }

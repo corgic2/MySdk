@@ -10,14 +10,6 @@ set(TARGET_NAME SDK)
 # 设置启动项目
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT SDK)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_BUILD_TYPE debug)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20")
-
-# 解决节数超过对象文件格式限制
-add_compile_options(-bigobj)
-
 # 检测平台（x86 或 x64）
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(PLATFORM_CPU "x64")
@@ -26,6 +18,17 @@ else()
 endif()
 message(STATUS "PLATFORM_CPU: ${PLATFORM_CPU}")
 
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/${PLATFORM_CPU})  # .lib文件
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/${PLATFORM_CPU})  # .dll文件
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/${PLATFORM_CPU})  # 运行时文件
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_BUILD_TYPE debug)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20")
+
+# 解决节数超过对象文件格式限制
+add_compile_options(-bigobj)
 
 # 添加VS过滤器
 macro(source_group_by_dir source_files)
@@ -50,11 +53,6 @@ macro(source_group_by_dir source_files)
     endif(MSVC)
 endmacro(source_group_by_dir)
 
-# 设置输出路径
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_CPU})
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_CPU})
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${PLATFORM_CPU})
-
 # 所有源文件
 file(GLOB_RECURSE SRC_FILE "*.cpp" "*.cxx" "*.cc" "*.C" "*.c++" "*.h" "*.hpp" "*.H" "*.hxx" "*.ui" "*.qrc" "*.ts")
 
@@ -69,7 +67,7 @@ list(FILTER TARGET_SRC EXCLUDE REGEX "build/*")
 source_group_by_dir(TARGET_SRC)
 
 # 添加可执行文件
-add_executable(${TARGET_NAME} ${TARGET_SRC})
+add_library(${TARGET_NAME} SHARED ${TARGET_SRC})
 
 # 包含目录
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/include)

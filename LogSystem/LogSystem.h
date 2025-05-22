@@ -7,9 +7,10 @@
 #include <mutex>
 #include <source_location>
 #include <string_view>
+#include "../SDKCommonDefine/SDK_Export.h"
 #include "../ThreadPool/ThreadPool.h"
 
-class LogSystemSyncThreadPool
+class SDK_API LogSystemSyncThreadPool
 {
 public:
     LogSystemSyncThreadPool();

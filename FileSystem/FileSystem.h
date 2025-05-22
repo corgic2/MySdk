@@ -8,6 +8,7 @@
 #pragma once
 #include <string>
 #include <boost/filesystem/path.hpp>
+#include "../SDKCommonDefine/SDK_Export.h"
 
 namespace my_sdk
 {
@@ -16,7 +17,7 @@ namespace my_sdk
   };
 
 
-  class FileSystem
+  class SDK_API FileSystem
   {
   public:
     FileSystem();
