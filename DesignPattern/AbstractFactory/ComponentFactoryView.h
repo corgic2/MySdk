@@ -1,14 +1,8 @@
 ﻿#pragma once
 #include "AbstractFactory.h"
-class ComponentFactoryView : public AbstractFactory
+class ComponentFactoryView : public CptBaseObject
 {
   public:
-    bool CreateComponent() override;
+    ST_ComponentBaseInfo* CreateComponentObject(unsigned long uid, const std::string& cptName) override;
 
-    bool OperateComponent(ST_OptearteBaseInfo *info) override;
-
-    bool NotifyComponent(ST_NotifyBaseInfo *info) override;
-
-  private:
-    void InitComponentViewMap();
 };

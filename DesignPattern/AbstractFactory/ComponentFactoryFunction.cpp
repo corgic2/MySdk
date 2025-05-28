@@ -1,20 +1,6 @@
 ﻿#include "ComponentFactoryFunction.h"
 
-bool ComponentFactoryFunction::CreateComponent()
+ST_ComponentBaseInfo* ComponentFactoryFunction::CreateComponentObject(unsigned long uid, const std::string& cptName)
 {
-    return true;
-}
-
-bool ComponentFactoryFunction::OperateComponent(ST_OptearteBaseInfo *info)
-{
-    return true;
-}
-
-bool ComponentFactoryFunction::NotifyComponent(ST_NotifyBaseInfo *info)
-{
-    return true;
-}
-
-void ComponentFactoryFunction::InitComponentFunctionMap()
-{
+    return nullptr;
 }

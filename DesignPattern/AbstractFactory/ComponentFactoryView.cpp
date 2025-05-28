@@ -1,20 +1,7 @@
 ﻿#include "ComponentFactoryView.h"
 
-bool ComponentFactoryView::CreateComponent()
+ST_ComponentBaseInfo* ComponentFactoryView::CreateComponentObject(unsigned long uid, const std::string& cptName)
 {
-    return true;
+    return nullptr;
 }
 
-bool ComponentFactoryView::OperateComponent(ST_OptearteBaseInfo *info)
-{
-    return true;
-}
-
-bool ComponentFactoryView::NotifyComponent(ST_NotifyBaseInfo *info)
-{
-    return true;
-}
-
-void ComponentFactoryView::InitComponentViewMap()
-{
-}
