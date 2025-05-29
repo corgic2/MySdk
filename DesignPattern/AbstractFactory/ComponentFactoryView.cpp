@@ -1,7 +1,9 @@
 ﻿#include "ComponentFactoryView.h"
 
-ST_ComponentBaseInfo* ComponentFactoryView::CreateComponentObject(unsigned long uid, const std::string& cptName)
+void ComponentFactoryView::PrintText()
 {
-    return nullptr;
+	std::cout << "ComponentFactoryView Print" << std::endl;
 }
-
+void ComponentFactoryView::RegisterComponent()
+{ 
+}

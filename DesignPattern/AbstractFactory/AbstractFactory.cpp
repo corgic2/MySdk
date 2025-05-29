@@ -1,31 +1,28 @@
 ﻿#include "AbstractFactory.h"
+#include "ComponentFactoryView.h"
 
-void CptBaseObjectService::RegisterFCptObject(const ST_ComponentBaseInfo& info)
-{
-}
-
-void CptBaseObjectService::RegisterVCptObject(const ST_ComponentBaseInfo& info)
-{
-}
-
-void CptBaseObjectService::RegisterLCptObject(const ST_ComponentBaseInfo& info)
-{
-}
-void CptBaseObject::PrintText()
-{
-	if (m_cptBaseInfo == nullptr)
-	{
-		std::cout << "errCptInfo : CptInfo is Nullptr"<<std::endl;
-	}
-	else
-	{
-		std::cout << "CptInfo : uid is: " << m_cptBaseInfo->cptUID << "  CptName is : " << m_cptBaseInfo->cptName << std::endl;
-	}
-}
 CptBaseObject::CptBaseObject()
 {
 }
 
 CptBaseObject::~CptBaseObject()
+{
+}
+
+void CptBaseObject::CreateComponentObject()
+{
+	for (auto& tmp : m_cptMap)
+	{
+		ComponentObject* object = new ComponentObject(tmp.second);
+	}
+}
+
+
+ComponentObject::ComponentObject(const ST_ComponentBaseInfo& info)
+{
+	std::cout << "ComponentObject : UID is : " << info.cptUID << " Name is : " << info.cptName << std::endl;
+}
+
+ComponentObject::~ComponentObject()
 {
 }

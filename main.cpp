@@ -10,7 +10,7 @@
 #include "ThreadPool/ThreadPool.h"
 #pragma execution_character_set("utf-8")
 #define LogSystemTest 0
-#define THREADPOOL 1
+#define THREADPOOLTest 0
 int main()
 {
     //FileSystemTest();
@@ -32,7 +32,7 @@ int main()
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
     std::cout << "Throughput: " << 1e6 / duration.count() << " logs/ms\n";
 #endif
-#if THREADPOOL
+#if THREADPOOLTest
     {
         ThreadPool pool; // 创建一个线程池，最多4个线程
         // 并发测试
@@ -61,6 +61,7 @@ int main()
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 #endif
+
     std::cout << "Main Function End" << std::endl;
     return 0;
 }

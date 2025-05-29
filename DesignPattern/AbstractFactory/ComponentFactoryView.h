@@ -3,6 +3,6 @@
 class ComponentFactoryView : public CptBaseObject
 {
   public:
-    ST_ComponentBaseInfo* CreateComponentObject(unsigned long uid, const std::string& cptName) override;
-
+    void RegisterComponent()override;
+    void PrintText() override;
 };

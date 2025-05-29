@@ -2,10 +2,18 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
+
+enum EM_CptType
+{
+    FCpt = 0,
+    VCpt,
+    LCpt
+};
 struct ST_ComponentBaseInfo
 {
     unsigned long cptUID;
     std::string cptName;
+    unsigned int type;
 };
 
 class CptBaseObject
@@ -13,19 +21,16 @@ class CptBaseObject
   public:
     CptBaseObject();
     virtual ~CptBaseObject();
-    virtual ST_ComponentBaseInfo *CreateComponentObject(unsigned long uid,const std::string& cptName) = 0;
+    void CreateComponentObject();
+    virtual void RegisterComponent() = 0;
     virtual void PrintText() = 0;
-  private:
-    ST_ComponentBaseInfo* m_cptBaseInfo = nullptr;
+public:
+    std::unordered_map<unsigned long, ST_ComponentBaseInfo> m_cptMap;
 };
 
-class CptBaseObjectService
+class ComponentObject
 {
-    void RegisterFCptObject(const ST_ComponentBaseInfo& info);
-    void RegisterVCptObject(const ST_ComponentBaseInfo& info);
-    void RegisterLCptObject(const ST_ComponentBaseInfo& info);
-private:
-    std::unordered_map<unsigned long, CptBaseObject*> m_fCptMap;
-    std::unordered_map<unsigned long, CptBaseObject*> m_vCptMap;
-    std::unordered_map<unsigned long, CptBaseObject*> m_lCptMap;
+public:
+    ComponentObject(const ST_ComponentBaseInfo& info);
+    ~ComponentObject();
 };
