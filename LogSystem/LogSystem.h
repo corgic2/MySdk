@@ -208,6 +208,10 @@ private:
     std::unique_ptr<std::thread> m_writeThread; ///< 写入线程
     bool m_running; ///< 运行标志
     size_t m_currentFileSize; ///< 当前文件大小
+    std::stringstream m_buffer; ///< 日志缓冲区
+    std::chrono::steady_clock::time_point m_lastFlushTime; ///< 上次刷新时间
+    static constexpr size_t BUFFER_SIZE = 8192; ///< 缓冲区大小
+    static constexpr auto FLUSH_INTERVAL = std::chrono::seconds(1); ///< 刷新间隔
 };
 
 /// <summary>
