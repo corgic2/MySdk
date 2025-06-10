@@ -1,167 +1,185 @@
-﻿#include <condition_variable>
-#include <future>
-#include <future>
-#include <mutex>
-#include <queue>
-#include <thread>
-#include "../SDKCommonDefine/SDK_Export.h"
+﻿/// <summary>
+/// 线程池头文件
+/// </summary>
 #pragma once
+#include <vector>
+#include <queue>
+#include <memory>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <future>
+#include <functional>
+#include <stdexcept>
+#include <atomic>
+#include <type_traits>
+#include "../SDKCommonDefine/SDK_Export.h"
 
-class FuncTemplateClass
+/// <summary>
+/// 线程池任务优先级枚举
+/// </summary>
+enum class EM_TaskPriority
 {
-public:
-    struct ST_FuncBase
-    {
-        virtual void Call() = 0;
-        virtual ~ST_FuncBase() = default;
-    };
-
-    template <typename Func>
-    struct ST_FuncImpl : public ST_FuncBase
-    {
-        void Call() override
-        {
-            m_func();
-        }
-
-        ST_FuncImpl(Func&& func)
-            : m_func(std::move(func))
-        {
-        }
-
-        Func m_func;
-    };
-
-    FuncTemplateClass() = default;
-    //三种拷贝构造删除
-    FuncTemplateClass(const FuncTemplateClass&) = delete;
-    FuncTemplateClass& operator=(const FuncTemplateClass&) = delete;
-    FuncTemplateClass(FuncTemplateClass&) = delete;
-
-    template <typename Func>
-    FuncTemplateClass(Func&& funcObject)
-        : m_impl(new ST_FuncImpl<Func>(std::forward<Func>(funcObject)))
-    {
-    }
-
-    FuncTemplateClass(FuncTemplateClass&& object)
-    {
-        m_impl = std::move(object.m_impl);
-        object.m_impl = nullptr;
-    }
-
-    FuncTemplateClass& operator=(FuncTemplateClass&& object)
-    {
-        if (this != &object)
-        {
-            m_impl = std::move(object.m_impl);
-            object.m_impl = nullptr;
-        }
-        return *this;
-    }
-
-    void operator()()
-    {
-        if (m_impl)
-        {
-            m_impl->Call();
-        }
-    }
-
-private:
-    std::unique_ptr<ST_FuncBase> m_impl = nullptr;
+    Low,        ///< 低优先级
+    Normal,     ///< 普通优先级
+    High,       ///< 高优先级
+    Critical    ///< 关键优先级
 };
 
+/// <summary>
+/// 线程池配置结构体
+/// </summary>
+struct ST_ThreadPoolConfig
+{
+    size_t m_minThreads; ///< 最小线程数
+    size_t m_maxThreads; ///< 最大线程数
+    size_t m_maxQueueSize; ///< 最大队列大小
+    size_t m_keepAliveTime; ///< 空闲线程保持时间(毫秒)
 
-class ThreadPool
+    /// <summary>
+    /// 构造函数，初始化默认配置
+    /// </summary>
+    ST_ThreadPoolConfig()
+        : m_minThreads(2)
+        , m_maxThreads(std::thread::hardware_concurrency())
+        , m_maxQueueSize(10000)
+        , m_keepAliveTime(60000) // 1分钟
+    {
+    }
+};
+
+/// <summary>
+/// 线程池任务结构体
+/// </summary>
+struct ST_Task
+{
+    std::function<void()> m_func; ///< 任务函数
+    EM_TaskPriority m_priority; ///< 任务优先级
+    std::chrono::steady_clock::time_point m_submitTime;  ///< 提交时间
+
+    /// <summary>
+    /// 任务比较函数，用于优先级队列
+    /// </summary>
+    /// <param name="other">另一个任务对象</param>
+    /// <returns>当前任务优先级是否小于另一个任务</returns>
+    bool operator<(const ST_Task& other) const
+    {
+        return m_priority < other.m_priority;
+    }
+};
+
+/// <summary>
+/// 线程池类，提供基于优先级的任务调度功能
+/// </summary>
+class SDK_API ThreadPool
 {
 public:
-    ThreadPool();
+    /// <summary>
+    /// 构造函数
+    /// </summary>
+    /// <param name="config">线程池配置</param>
+    explicit ThreadPool(const ST_ThreadPoolConfig& config = ST_ThreadPoolConfig());
+
+    /// <summary>
+    /// 析构函数
+    /// </summary>
     ~ThreadPool();
 
-    template <typename Func>
-    std::future<std::invoke_result_t<Func>> AddTask(Func f)
+    /// <summary>
+    /// 提交任务到线程池
+    /// </summary>
+    /// <param name="task">任务函数</param>
+    /// <param name="priority">任务优先级</param>
+    /// <returns>future对象，用于获取任务结果</returns>
+    template <typename F>
+    auto Submit(F&& f, EM_TaskPriority priority = EM_TaskPriority::Normal) 
+        -> std::future<decltype(std::declval<std::decay_t<F>>()())>
     {
-        using result = std::invoke_result_t<Func>;
-        std::packaged_task<result()> task(std::move(f));
-        // task不可复制，只能通过移动,因此，task内的函数也应当仅支持移动
-        // 并且要获取函数返回值，则同步需要模板函数编程，因此自定义函数类
-        std::future<result> res = task.get_future();
-        // 每次寻找最轻松的队列，以防任务不均衡
-        size_t idx = FindLightestQueue();
-        std::unique_lock<std::mutex> lock(m_localWorkQueue[idx].mutex, std::try_to_lock);
-        if (lock.owns_lock() && m_localWorkQueue[idx].queue)
+        using return_type = decltype(std::declval<std::decay_t<F>>()());
+
+        auto task = std::make_shared<std::packaged_task<return_type()>>(std::forward<F>(f));
+        std::future<return_type> res = task->get_future();
+        
         {
-            m_localWorkQueue[idx].queue->emplace(std::move(task));
-            return res;
+            std::unique_lock<std::mutex> lock(m_mutex);
+
+            if (m_stop)
+            {
+                throw std::runtime_error("ThreadPool is stopped");
+            }
+
+            if (m_tasks.size() >= m_config.m_maxQueueSize)
+            {
+                throw std::runtime_error("Task queue is full");
+            }
+
+            ST_Task taskWrapper;
+            taskWrapper.m_func = [task]() { (*task)(); };
+            taskWrapper.m_priority = priority;
+            taskWrapper.m_submitTime = std::chrono::steady_clock::now();
+
+            m_tasks.push(std::move(taskWrapper));
         }
-        // 回退到全局队列
-        std::lock_guard<std::mutex> globalLock(m_globalMutex);
-        m_workGlobalQueue.emplace(std::move(task));
+
         m_condition.notify_one();
         return res;
     }
 
-private:
-    using m_threadQueue = std::queue<FuncTemplateClass>;
+    /// <summary>
+    /// 获取当前线程数
+    /// </summary>
+    /// <returns>当前线程数</returns>
+    size_t GetCurrentThreadCount() const { return m_totalThreads.load(); }
 
-    struct ST_localThreadQueue
+    /// <summary>
+    /// 获取当前任务数
+    /// </summary>
+    /// <returns>当前任务数</returns>
+    size_t GetTaskCount() 
     {
-        ST_localThreadQueue() = default;
-
-        ST_localThreadQueue(ST_localThreadQueue&& other)
-            : queue(std::move(other.queue))
-        {
-        }
-
-        ST_localThreadQueue& operator=(ST_localThreadQueue&& other)
-        {
-            if (this != &other)
-            {
-                queue = std::move(other.queue);
-            }
-            return *this;
-        }
-
-        ST_localThreadQueue& operator=(const ST_localThreadQueue& other) = delete;
-        ST_localThreadQueue(const ST_localThreadQueue& other) = delete;
-        ST_localThreadQueue(ST_localThreadQueue& other) = delete;
-
-        std::unique_ptr<m_threadQueue> queue;
-        std::mutex mutex;
-    };
-
-    void WorkThread();
-    int FindLightestQueue();
-    bool TrySteal(size_t index);
-    bool WorkThread(size_t index);
-    bool WorkGlobalThread();
-private:
-    std::atomic_bool m_globalDone;
-    std::queue<FuncTemplateClass> m_workGlobalQueue;
-    std::mutex m_globalMutex;
-     
-    std::vector<ST_localThreadQueue> m_localWorkQueue; // 根据当前线程不同各自拥有一个任务队列，减少全局队列的锁竞争
-    static thread_local int m_threadIndex;
-
-    std::atomic<size_t> m_nextQueueIndex{0}; // 新增原子计数器
-    std::vector<std::thread> m_threads;
-
-    std::condition_variable m_condition;
-};
-
-class SDK_API GlobalThreadPool
-{
-public:
-    GlobalThreadPool()
-    {
-        m_pool = std::make_unique<ThreadPool>();
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return m_tasks.size();
     }
 
-    ~GlobalThreadPool()
-    {
-    }
+    /// <summary>
+    /// 调整线程池大小
+    /// </summary>
+    /// <param name="minThreads">最小线程数</param>
+    /// <param name="maxThreads">最大线程数</param>
+    void Resize(size_t minThreads, size_t maxThreads);
+
+    /// <summary>
+    /// 等待所有任务完成
+    /// </summary>
+    void WaitAll();
+
+    /// <summary>
+    /// 停止线程池
+    /// </summary>
+    void Shutdown();
 
 private:
-    std::unique_ptr<ThreadPool> m_pool = nullptr;
+    /// <summary>
+    /// 工作线程函数
+    /// </summary>
+    void WorkerThread();
+
+    /// <summary>
+    /// 调整工作线程数量
+    /// </summary>
+    void AdjustThreadCount();
+
+    /// <summary>
+    /// 创建新的工作线程
+    /// </summary>
+    void CreateWorkerThread();
+
+private:
+    std::vector<std::thread> m_workers; ///< 工作线程集合
+    std::priority_queue<ST_Task> m_tasks; ///< 任务队列
+    mutable std::mutex m_mutex; ///< 互斥锁
+    std::condition_variable m_condition; ///< 条件变量
+    ST_ThreadPoolConfig m_config; ///< 线程池配置
+    std::atomic<bool> m_stop; ///< 停止标志
+    std::atomic<size_t> m_totalThreads; ///< 总线程数
 };
