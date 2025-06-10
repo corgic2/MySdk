@@ -231,13 +231,23 @@ void LogSystem::WriteLogToFile(const ST_LogMessage& msg)
         logLine.append(msg.m_message, msg.m_messageLength);
     }
     logLine.append("\n");
-
+    
     bool needFlush = false;
     {
         std::lock_guard<std::mutex> lock(m_bufferMutex);
         if (!m_currentBuffer.Append(logLine))
         {
-            // 当前缓冲区已满，切换到下一个缓冲区
+            // 当前缓冲区已满，压缩并写入文件
+            if (m_currentBuffer.m_size > 0)
+            {
+                ST_CompressedLogBlock block;
+                block.m_originalSize = m_currentBuffer.m_size;
+                block.m_timestamp = std::time(nullptr);
+                block.m_data = LogCompressor::Compress(m_currentBuffer.m_data, m_config.m_compressLevel);
+                block.WriteToFile(m_logFile);
+            }
+
+            // 切换到下一个缓冲区
             if (!m_bufferPool.empty())
             {
                 auto buffer = std::move(m_bufferPool.back());
@@ -251,7 +261,7 @@ void LogSystem::WriteLogToFile(const ST_LogMessage& msg)
         }
     }
 
-    if (needFlush ||
+    if (needFlush || 
         std::chrono::steady_clock::now() - m_lastFlushTime >= FLUSH_INTERVAL)
     {
         Flush();
@@ -324,7 +334,12 @@ void LogSystem::Flush()
 
     if (bufferToWrite.m_size > 0)
     {
-        m_logFile.write(bufferToWrite.m_data.c_str(), bufferToWrite.m_size);
+        // 压缩并写入文件
+        ST_CompressedLogBlock block;
+        block.m_originalSize = bufferToWrite.m_size;
+        block.m_timestamp = std::time(nullptr);
+        block.m_data = LogCompressor::Compress(bufferToWrite.m_data, m_config.m_compressLevel);
+        block.WriteToFile(m_logFile);
         m_logFile.flush();
         m_lastFlushTime = std::chrono::steady_clock::now();
     }

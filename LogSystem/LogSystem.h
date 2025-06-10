@@ -13,6 +13,7 @@
 #include <chrono>
 #include "../SDKCommonDefine/SDK_Export.h"
 #include "MemoryPool.h"
+#include "LogCompressor.h"
 
 /// <summary>
 /// 日志级别枚举
@@ -36,6 +37,7 @@ struct ST_LogConfig
     size_t m_maxQueueSize; ///< 最大队列大小
     size_t m_maxFileSize; ///< 最大文件大小(字节)
     bool m_asyncEnabled; ///< 是否启用异步日志
+    EM_CompressLevel m_compressLevel; ///< 压缩等级
 
     /// <summary>
     /// 构造函数，初始化默认配置
@@ -45,6 +47,7 @@ struct ST_LogConfig
         , m_maxQueueSize(10000)
         , m_maxFileSize(5 * 1024 * 1024) // 5MB
         , m_asyncEnabled(true)
+        , m_compressLevel(EM_CompressLevel::Fast)
     {
     }
 };
