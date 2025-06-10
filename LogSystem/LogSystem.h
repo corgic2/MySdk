@@ -10,7 +10,9 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <chrono>
 #include "../SDKCommonDefine/SDK_Export.h"
+#include "MemoryPool.h"
 
 /// <summary>
 /// 日志级别枚举
@@ -53,7 +55,8 @@ struct ST_LogConfig
 struct ST_LogMessage
 {
     EM_LogLevel m_level; ///< 日志级别
-    std::string m_message; ///< 日志消息
+    char* m_message; ///< 日志消息
+    size_t m_messageLength; ///< 消息长度
     std::string m_timestamp; ///< 时间戳
     std::string m_fileName; ///< 文件名
     int m_lineNumber; ///< 行号
@@ -62,8 +65,110 @@ struct ST_LogMessage
     /// 构造函数，初始化默认值
     /// </summary>
     ST_LogMessage()
-        : m_lineNumber(0)
+        : m_level(EM_LogLevel::Info)
+        , m_message(nullptr)
+        , m_messageLength(0)
+        , m_lineNumber(0)
     {
+    }
+
+    /// <summary>
+    /// 析构函数
+    /// </summary>
+    ~ST_LogMessage()
+    {
+        if (m_message)
+        {
+            StringMemoryPool::Instance().Deallocate(m_message);
+            m_message = nullptr;
+        }
+    }
+
+    /// <summary>
+    /// 设置消息内容
+    /// </summary>
+    /// <param name="message">消息字符串</param>
+    void SetMessage(const std::string& message)
+    {
+        m_messageLength = message.length();
+        m_message = StringMemoryPool::Instance().Allocate(m_messageLength + 1);
+        std::copy(message.c_str(), message.c_str() + m_messageLength + 1, m_message);
+    }
+};
+
+/// <summary>
+/// 日志缓冲区结构体
+/// </summary>
+struct ST_LogBuffer {
+    std::string m_data;          ///< 缓冲区数据
+    size_t m_size;              ///< 当前大小
+    static const size_t MAX_SIZE = 8192; ///< 最大大小
+
+    /// <summary>
+    /// 构造函数
+    /// </summary>
+    ST_LogBuffer() : m_size(0) {
+        m_data.reserve(MAX_SIZE);
+    }
+
+    /// <summary>
+    /// 追加数据
+    /// </summary>
+    /// <param name="data">数据</param>
+    /// <returns>是否成功</returns>
+    bool Append(const std::string& data) {
+        if (m_size + data.size() > MAX_SIZE) {
+            return false;
+        }
+        m_data.append(data);
+        m_size += data.size();
+        return true;
+    }
+
+    /// <summary>
+    /// 清空缓冲区
+    /// </summary>
+    void Clear() {
+        m_data.clear();
+        m_size = 0;
+    }
+};
+
+/// <summary>
+/// 日志批处理结构体
+/// </summary>
+struct ST_LogBatch {
+    static const size_t MAX_BATCH_SIZE = 1000;  ///< 最大批处理大小
+    std::vector<ST_LogMessage> m_messages;      ///< 消息列表
+    size_t m_totalSize;                         ///< 总大小（字节）
+
+    /// <summary>
+    /// 构造函数
+    /// </summary>
+    ST_LogBatch() : m_totalSize(0) {
+        m_messages.reserve(MAX_BATCH_SIZE);
+    }
+
+    /// <summary>
+    /// 添加消息到批处理
+    /// </summary>
+    /// <param name="msg">日志消息</param>
+    /// <returns>是否成功</returns>
+    bool Add(ST_LogMessage&& msg) {
+        if (m_messages.size() >= MAX_BATCH_SIZE) {
+            return false;
+        }
+        m_totalSize += msg.m_messageLength;
+        m_messages.push_back(std::move(msg));
+        return true;
+    }
+
+    /// <summary>
+    /// 清空批处理
+    /// </summary>
+    void Clear() {
+        m_messages.clear();
+        m_totalSize = 0;
     }
 };
 
@@ -202,16 +307,23 @@ private:
 private:
     std::mutex m_mutex; ///< 互斥锁
     std::condition_variable m_condition; ///< 条件变量
-    std::queue<ST_LogMessage> m_messageQueue; ///< 消息队列
+    std::queue<ST_LogBatch> m_messageQueue; ///< 消息队列
     std::ofstream m_logFile; ///< 日志文件流
     ST_LogConfig m_config; ///< 日志配置
     std::unique_ptr<std::thread> m_writeThread; ///< 写入线程
     bool m_running; ///< 运行标志
     size_t m_currentFileSize; ///< 当前文件大小
-    std::stringstream m_buffer; ///< 日志缓冲区
     std::chrono::steady_clock::time_point m_lastFlushTime; ///< 上次刷新时间
     static constexpr size_t BUFFER_SIZE = 8192; ///< 缓冲区大小
     static constexpr auto FLUSH_INTERVAL = std::chrono::seconds(1); ///< 刷新间隔
+    ST_LogBuffer m_currentBuffer; ///< 当前缓冲区
+    ST_LogBuffer m_nextBuffer; ///< 下一个缓冲区
+    std::vector<std::unique_ptr<ST_LogBuffer>> m_bufferPool; ///< 缓冲区池
+    std::mutex m_bufferMutex; ///< 缓冲区互斥锁
+    static constexpr size_t BUFFER_POOL_SIZE = 4; ///< 缓冲区池大小
+    ST_LogBatch m_currentBatch; ///< 当前批处理
+    std::mutex m_batchMutex; ///< 批处理互斥锁
+    static constexpr size_t MAX_BATCH_WAIT_MS = 100; ///< 最大批处理等待时间（毫秒）
 };
 
 /// <summary>

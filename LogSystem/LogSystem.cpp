@@ -11,8 +11,11 @@ LogSystem::LogSystem()
     , m_currentFileSize(0)
     , m_lastFlushTime(std::chrono::steady_clock::now())
 {
-    m_buffer.str("");
-    m_buffer.clear();
+    // 初始化缓冲区池
+    for (size_t i = 0; i < BUFFER_POOL_SIZE; ++i)
+    {
+        m_bufferPool.push_back(std::make_unique<ST_LogBuffer>());
+    }
 }
 
 LogSystem::~LogSystem()
@@ -87,17 +90,27 @@ void LogSystem::WriteLog(EM_LogLevel level, const std::string& message,
 
     ST_LogMessage logMsg;
     logMsg.m_level = level;
-    logMsg.m_message = message;
+    logMsg.SetMessage(message);
     logMsg.m_timestamp = GetTimestamp();
     logMsg.m_fileName = file ? file : "";
     logMsg.m_lineNumber = line;
 
     if (m_config.m_asyncEnabled)
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        if (m_messageQueue.size() < m_config.m_maxQueueSize)
+        bool needFlush = false;
         {
-            m_messageQueue.push(std::move(logMsg));
+            std::lock_guard<std::mutex> lock(m_batchMutex);
+            if (!m_currentBatch.Add(std::move(logMsg)))
+            {
+                // 当前批次已满，通知异步线程处理
+                m_messageQueue.push(std::move(m_currentBatch));
+                m_currentBatch.Clear();
+                m_currentBatch.Add(std::move(logMsg));
+                needFlush = true;
+            }
+        }
+        if (needFlush)
+        {
             m_condition.notify_one();
         }
     }
@@ -110,47 +123,76 @@ void LogSystem::WriteLog(EM_LogLevel level, const std::string& message,
 
 void LogSystem::AsyncWrite()
 {
-    const size_t batchSize = 100; // 批处理大小
-    std::vector<ST_LogMessage> msgBatch;
-    msgBatch.reserve(batchSize);
+    ST_LogBatch localBatch;
+    std::chrono::steady_clock::time_point lastProcessTime = std::chrono::steady_clock::now();
 
     while (m_running)
     {
+        bool hasBatch = false;
         {
             std::unique_lock<std::mutex> lock(m_mutex);
-            m_condition.wait_for(lock, std::chrono::milliseconds(100), [this]()
-            {
-                return !m_messageQueue.empty() || !m_running;
-            });
+            auto now = std::chrono::steady_clock::now();
+            auto timeSinceLastProcess = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                                                              now - lastProcessTime).count();
+
+            // 等待新的批次或超时
+            m_condition.wait_for(lock, std::chrono::milliseconds(MAX_BATCH_WAIT_MS - timeSinceLastProcess),
+                                 [this, timeSinceLastProcess]()
+                                 {
+                                     return !m_messageQueue.empty() || !m_running || timeSinceLastProcess >= MAX_BATCH_WAIT_MS;
+                                 });
 
             if (!m_running && m_messageQueue.empty())
             {
                 break;
             }
 
-            // 批量获取消息
-            while (!m_messageQueue.empty() && msgBatch.size() < batchSize)
+            // 获取待处理的批次
+            if (!m_messageQueue.empty())
             {
-                msgBatch.push_back(std::move(m_messageQueue.front()));
+                localBatch = std::move(m_messageQueue.front());
                 m_messageQueue.pop();
+                hasBatch = true;
+            }
+            else if (timeSinceLastProcess >= MAX_BATCH_WAIT_MS)
+            {
+                // 超时，处理当前批次
+                std::lock_guard<std::mutex> batchLock(m_batchMutex);
+                if (!m_currentBatch.m_messages.empty())
+                {
+                    localBatch = std::move(m_currentBatch);
+                    m_currentBatch.Clear();
+                    hasBatch = true;
+                }
             }
         }
 
-        // 批量写入消息
-        for (const auto& msg : msgBatch)
+        // 处理批次
+        if (hasBatch)
         {
-            WriteLogToFile(msg);
+            for (auto& msg : localBatch.m_messages)
+            {
+                WriteLogToFile(msg);
+            }
+            localBatch.Clear();
+            lastProcessTime = std::chrono::steady_clock::now();
         }
-        msgBatch.clear();
+
+        // 定期检查并清理缓冲区池
+        static size_t cleanupCounter = 0;
+        if (++cleanupCounter >= 1000)
+        {
+            cleanupCounter = 0;
+            std::lock_guard<std::mutex> lock(m_bufferMutex);
+            while (m_bufferPool.size() > BUFFER_POOL_SIZE)
+            {
+                m_bufferPool.pop_back();
+            }
+        }
     }
 
-    // 确保缓冲区中的数据被写入
-    if (m_buffer.tellp() > 0)
-    {
-        std::string content = m_buffer.str();
-        m_logFile.write(content.c_str(), content.length());
-        m_logFile.flush();
-    }
+    // 确保所有数据都被写入
+    Flush();
 }
 
 void LogSystem::WriteLogToFile(const ST_LogMessage& msg)
@@ -162,32 +204,60 @@ void LogSystem::WriteLogToFile(const ST_LogMessage& msg)
 
     CheckRotateFile();
 
-    std::stringstream ss;
-    ss << "[" << msg.m_timestamp << "] "
-       << "[" << GetLevelString(msg.m_level) << "] ";
+    // 预分配字符串缓冲区，避免频繁的内存分配
+    thread_local std::string logLine;
+    logLine.clear();
+    logLine.reserve(1024); // 预分配1KB空间
+
+    // 使用string的append代替stringstream，减少内存分配
+    logLine.append("[");
+    logLine.append(msg.m_timestamp);
+    logLine.append("] [");
+    logLine.append(GetLevelString(msg.m_level));
+    logLine.append("] ");
 
     if (!msg.m_fileName.empty())
     {
-        ss << "(" << msg.m_fileName << ":" << msg.m_lineNumber << ") ";
+        logLine.append("(");
+        logLine.append(msg.m_fileName);
+        logLine.append(":");
+        logLine.append(std::to_string(msg.m_lineNumber));
+        logLine.append(") ");
     }
 
-    ss << "- " << msg.m_message << "\n";
-
-    std::string logLine = ss.str();
-    m_buffer << logLine;
-    m_currentFileSize += logLine.length();
-
-    auto now = std::chrono::steady_clock::now();
-    if (m_buffer.tellp() >= BUFFER_SIZE || 
-        now - m_lastFlushTime >= FLUSH_INTERVAL)
+    logLine.append("- ");
+    if (msg.m_message)
     {
-        std::string content = m_buffer.str();
-        m_logFile.write(content.c_str(), content.length());
-        m_logFile.flush();
-        m_buffer.str("");
-        m_buffer.clear();
-        m_lastFlushTime = now;
+        logLine.append(msg.m_message, msg.m_messageLength);
     }
+    logLine.append("\n");
+
+    bool needFlush = false;
+    {
+        std::lock_guard<std::mutex> lock(m_bufferMutex);
+        if (!m_currentBuffer.Append(logLine))
+        {
+            // 当前缓冲区已满，切换到下一个缓冲区
+            if (!m_bufferPool.empty())
+            {
+                auto buffer = std::move(m_bufferPool.back());
+                m_bufferPool.pop_back();
+                std::swap(m_currentBuffer, *buffer);
+                m_bufferPool.push_back(std::move(buffer));
+            }
+            m_currentBuffer.Clear();
+            m_currentBuffer.Append(logLine);
+            needFlush = true;
+        }
+    }
+
+    if (needFlush ||
+        std::chrono::steady_clock::now() - m_lastFlushTime >= FLUSH_INTERVAL)
+    {
+        Flush();
+    }
+
+    m_currentFileSize += logLine.length();
 }
 
 void LogSystem::CheckRotateFile()
@@ -241,14 +311,21 @@ const char* LogSystem::GetLevelString(EM_LogLevel level) const
 
 void LogSystem::Flush()
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_logFile.is_open() && m_buffer.tellp() > 0)
+    if (!m_logFile.is_open())
     {
-        std::string content = m_buffer.str();
-        m_logFile.write(content.c_str(), content.length());
+        return;
+    }
+
+    ST_LogBuffer bufferToWrite;
+    {
+        std::lock_guard<std::mutex> lock(m_bufferMutex);
+        std::swap(bufferToWrite, m_currentBuffer);
+    }
+
+    if (bufferToWrite.m_size > 0)
+    {
+        m_logFile.write(bufferToWrite.m_data.c_str(), bufferToWrite.m_size);
         m_logFile.flush();
-        m_buffer.str("");
-        m_buffer.clear();
         m_lastFlushTime = std::chrono::steady_clock::now();
     }
 }

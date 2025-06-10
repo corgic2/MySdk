@@ -460,11 +460,11 @@ void TestComputeBoundTasks()
 
             // 每1000个任务或者超过1秒输出一次进度
             auto now = std::chrono::steady_clock::now();
-            if (completed % 1000 == 0 || 
+            if (completed % 1000 == 0 ||
                 std::chrono::duration_cast<std::chrono::seconds>(now - lastProgress).count() >= 1)
             {
-                std::cout << "已完成: " << completed << "/" << TASK_COUNT 
-                         << " (错误: " << errors << ")" << std::endl;
+                std::cout << "已完成: " << completed << "/" << TASK_COUNT
+                    << " (错误: " << errors << ")" << std::endl;
                 lastProgress = now;
             }
         }
@@ -499,12 +499,12 @@ void TestIOBoundTasks()
     // 创建线程池，增加最大线程数
     ST_ThreadPoolConfig config;
     config.m_minThreads = 8;
-    config.m_maxThreads = 32;  // IO密集型任务需要更多线程
+    config.m_maxThreads = 32; // IO密集型任务需要更多线程
     ThreadPool pool(config);
 
     // 增加任务数
     const int TASK_COUNT = 10000;
-    const int IO_SIMULATION_TIME = 20;  // 模拟IO时间（毫秒）
+    const int IO_SIMULATION_TIME = 20; // 模拟IO时间（毫秒）
     std::vector<std::future<std::chrono::milliseconds>> results;
     results.reserve(TASK_COUNT);
 
@@ -516,11 +516,11 @@ void TestIOBoundTasks()
         auto future = pool.Submit([i, IO_SIMULATION_TIME]() -> std::chrono::milliseconds
         {
             auto taskStart = std::chrono::high_resolution_clock::now();
-            
+
             // 模拟随机IO操作
-            int sleepTime = IO_SIMULATION_TIME + (i % 10);  // 添加一些随机性
+            int sleepTime = IO_SIMULATION_TIME + (i % 10); // 添加一些随机性
             std::this_thread::sleep_for(std::chrono::milliseconds(sleepTime));
-            
+
             // 模拟一些轻量计算
             volatile int dummy = 0;
             for (int j = 0; j < 1000; ++j)
@@ -558,11 +558,11 @@ void TestIOBoundTasks()
             maxLatency = std::max(maxLatency, latencyMs);
 
             auto now = std::chrono::steady_clock::now();
-            if (completed % 1000 == 0 || 
+            if (completed % 1000 == 0 ||
                 std::chrono::duration_cast<std::chrono::seconds>(now - lastProgress).count() >= 1)
             {
-                std::cout << "已完成: " << completed << "/" << TASK_COUNT 
-                         << " (错误: " << errors << ")" << std::endl;
+                std::cout << "已完成: " << completed << "/" << TASK_COUNT
+                    << " (错误: " << errors << ")" << std::endl;
                 lastProgress = now;
             }
         }
@@ -604,14 +604,14 @@ void TestMixedPriorityTasks()
 
     // 增加任务数和更均匀的优先级分布
     const int TASK_COUNT = 10000;
-    const int TASK_DURATION = 5;  // 基础任务时间（毫秒）
+    const int TASK_DURATION = 5; // 基础任务时间（毫秒）
     std::vector<std::future<std::pair<int, std::chrono::milliseconds>>> results;
     results.reserve(TASK_COUNT);
 
     // 预定义优先级分布
     std::vector<EM_TaskPriority> priorities;
     priorities.reserve(TASK_COUNT);
-    
+
     // 确保每个优先级的任务数量相等
     for (int i = 0; i < TASK_COUNT / 4; ++i)
     {
@@ -620,7 +620,7 @@ void TestMixedPriorityTasks()
         priorities.push_back(EM_TaskPriority::Normal);
         priorities.push_back(EM_TaskPriority::Low);
     }
-    
+
     // 打乱优先级顺序
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -658,9 +658,9 @@ void TestMixedPriorityTasks()
 
             auto taskEnd = std::chrono::high_resolution_clock::now();
             return std::make_pair(
-                static_cast<int>(priority),
-                std::chrono::duration_cast<std::chrono::milliseconds>(taskEnd - taskStart)
-            );
+                                  static_cast<int>(priority),
+                                  std::chrono::duration_cast<std::chrono::milliseconds>(taskEnd - taskStart)
+                                 );
         }, priority);
 
         results.push_back(std::move(future));
@@ -691,11 +691,11 @@ void TestMixedPriorityTasks()
             maxLatency[priority] = std::max(maxLatency[priority], latencyMs);
 
             auto now = std::chrono::steady_clock::now();
-            if (completed % 1000 == 0 || 
+            if (completed % 1000 == 0 ||
                 std::chrono::duration_cast<std::chrono::seconds>(now - lastProgress).count() >= 1)
             {
-                std::cout << "已完成: " << completed << "/" << TASK_COUNT 
-                         << " (错误: " << errors << ")" << std::endl;
+                std::cout << "已完成: " << completed << "/" << TASK_COUNT
+                    << " (错误: " << errors << ")" << std::endl;
                 lastProgress = now;
             }
         }
@@ -716,17 +716,17 @@ void TestMixedPriorityTasks()
     std::cout << "平均每任务耗时: " << (duration.count() * 1.0 / completed) << "ms" << std::endl;
     std::cout << "吞吐量: " << (completed * 1000.0 / duration.count()) << " 任务/秒" << std::endl;
     std::cout << "\n各优先级任务统计:" << std::endl;
-    
+
     const char* priorityNames[] = {"Critical", "High", "Normal", "Low"};
     for (int i = 0; i < 4; ++i)
     {
         if (priorityCount[i] > 0)
         {
             std::cout << priorityNames[i] << "优先级:"
-                      << "\n  完成数量: " << priorityCount[i]
-                      << "\n  平均延迟: " << (priorityLatency[i] / priorityCount[i]) << "ms"
-                      << "\n  最大延迟: " << maxLatency[i] << "ms"
-                      << std::endl;
+                << "\n  完成数量: " << priorityCount[i]
+                << "\n  平均延迟: " << (priorityLatency[i] / priorityCount[i]) << "ms"
+                << "\n  最大延迟: " << maxLatency[i] << "ms"
+                << std::endl;
         }
     }
 
@@ -734,10 +734,161 @@ void TestMixedPriorityTasks()
 }
 
 /// <summary>
+/// 生成随机日志消息
+/// </summary>
+/// <param name="length">消息长度</param>
+/// <returns>随机消息字符串</returns>
+std::string GenerateRandomMessage(size_t length)
+{
+    static const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<> dis(0, sizeof(charset) - 2);
+
+    std::string str(length, 0);
+    for (size_t i = 0; i < length; ++i)
+    {
+        str[i] = charset[dis(gen)];
+    }
+    return str;
+}
+
+/// <summary>
+/// 日志系统压力测试类
+/// </summary>
+class LogSystemStressTest
+{
+public:
+    /// <summary>
+    /// 构造函数
+    /// </summary>
+    /// <param name="threadCount">测试线程数</param>
+    /// <param name="messageCount">每个线程的消息数</param>
+    /// <param name="messageSize">消息大小</param>
+    LogSystemStressTest(size_t threadCount, size_t messageCount, size_t messageSize)
+        : m_threadCount(threadCount)
+        , m_messageCount(messageCount)
+        , m_messageSize(messageSize)
+    {
+        // 配置线程池
+        ST_ThreadPoolConfig threadConfig;
+        threadConfig.m_minThreads = threadCount;
+        threadConfig.m_maxThreads = threadCount;
+        threadConfig.m_maxQueueSize = messageCount * threadCount;
+        threadConfig.m_keepAliveTime = 1000;
+        m_threadPool = std::make_unique<ThreadPool>(threadConfig);
+
+        // 初始化日志系统
+        ST_LogConfig logConfig;
+        logConfig.m_logFilePath = "stress_test.log";
+        logConfig.m_logLevel = EM_LogLevel::Info;
+        logConfig.m_maxFileSize = 1024 * 1024 * 1024; // 1GB
+        logConfig.m_asyncEnabled = true;
+        LogSystem::Instance().Initialize(logConfig);
+    }
+
+    /// <summary>
+    /// 运行压力测试
+    /// </summary>
+    void RunTest()
+    {
+        std::cout << "Starting stress test with:" << std::endl
+            << "Thread count: " << m_threadCount << std::endl
+            << "Messages per thread: " << m_messageCount << std::endl
+            << "Message size: " << m_messageSize << " bytes" << std::endl;
+
+        auto startTime = std::chrono::high_resolution_clock::now();
+        std::vector<std::future<void>> futures;
+
+        // 提交测试任务
+        for (size_t i = 0; i < m_threadCount; ++i)
+        {
+            futures.push_back(m_threadPool->Submit([this, i]()
+            {
+                this->WriteLogsWorker(i);
+            }));
+        }
+
+        // 等待所有任务完成
+        for (auto& future : futures)
+        {
+            future.wait();
+        }
+
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+
+        // 确保所有日志都被写入
+        LogSystem::Instance().Flush();
+
+        // 计算并显示统计信息
+        size_t totalMessages = m_threadCount * m_messageCount;
+        double totalSeconds = duration.count() / 1000.0;
+        double messagesPerSecond = totalMessages / totalSeconds;
+        double mbPerSecond = (totalMessages * m_messageSize) / (1024.0 * 1024.0 * totalSeconds);
+
+        std::cout << "\nTest completed:" << std::endl
+            << "Total time: " << totalSeconds << " seconds" << std::endl
+            << "Messages per second: " << messagesPerSecond << std::endl
+            << "Throughput: " << mbPerSecond << " MB/s" << std::endl;
+    }
+
+private:
+    /// <summary>
+    /// 工作线程函数
+    /// </summary>
+    /// <param name="threadId">线程ID</param>
+    void WriteLogsWorker(size_t threadId)
+    {
+        std::vector<EM_LogLevel> levels = {
+            EM_LogLevel::Debug,
+            EM_LogLevel::Info,
+            EM_LogLevel::Warning,
+            EM_LogLevel::Error,
+            EM_LogLevel::Fatal
+        };
+
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> levelDis(0, levels.size() - 1);
+
+        for (size_t i = 0; i < m_messageCount; ++i)
+        {
+            std::string message = GenerateRandomMessage(m_messageSize);
+            EM_LogLevel level = levels[levelDis(gen)];
+            LogSystem::Instance().WriteLog(
+                                           level,
+                                           "Thread-" + std::to_string(threadId) + ": " + message
+                                          );
+        }
+    }
+
+private:
+    size_t m_threadCount; ///< 测试线程数
+    size_t m_messageCount; ///< 每个线程的消息数
+    size_t m_messageSize; ///< 消息大小
+    std::unique_ptr<ThreadPool> m_threadPool; ///< 线程池
+};
+
+/// <summary>
 /// 主函数
 /// </summary>
 int main()
 {
+    try
+    {
+        // 创建压力测试实例
+        // 参数：8个线程，每个线程100000条消息，每条消息128字节
+        LogSystemStressTest test(8, 100000, 128);
+        test.RunTest();
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
+
+    return 0;
     try
     {
         std::cout << "=== 开始线程池性能测试 ===" << std::endl;
