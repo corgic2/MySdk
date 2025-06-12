@@ -2,8 +2,11 @@
 #include <fstream>
 #include <iostream>
 #include <boost/filesystem.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
 #include <sys/stat.h>
 #include <ctime>
+#include <algorithm>
 
 namespace my_sdk
 {
@@ -346,9 +349,7 @@ namespace my_sdk
         }
     }
 
-    void FileSystem::GetDirectoryContents(const std::string& dir,
-                                        std::vector<std::string>& files,
-                                        std::vector<std::string>& directories)
+    void FileSystem::GetDirectoryContents(const std::string& dir, std::vector<std::string>& files, std::vector<std::string>& directories)
     {
         try
         {
@@ -403,5 +404,276 @@ namespace my_sdk
     {
         // TODO: 实现编码转换功能
         return input;
+    }
+
+    EM_JsonOperationResult FileSystem::WriteJsonToFile(const std::string& filePath, const std::string& jsonStr, bool pretty)
+    {
+        try
+        {
+            // 首先验证JSON格式
+            if (!ValidateJsonString(jsonStr))
+            {
+                return EM_JsonOperationResult::InvalidJson;
+            }
+
+            // 确保父目录存在
+            boost::filesystem::path path(filePath);
+            boost::filesystem::create_directories(path.parent_path());
+
+            // 如果需要格式化
+            std::string outputStr;
+            if (pretty)
+            {
+                if (!FormatJsonString(jsonStr, outputStr))
+                {
+                    return EM_JsonOperationResult::InvalidJson;
+                }
+            }
+            else
+            {
+                outputStr = jsonStr;
+            }
+
+            // 写入文件
+            if (!WriteStringToFile(filePath, outputStr))
+            {
+                return EM_JsonOperationResult::WriteError;
+            }
+
+            return EM_JsonOperationResult::Success;
+        }
+        catch (const std::exception&)
+        {
+            return EM_JsonOperationResult::WriteError;
+        }
+    }
+
+    EM_JsonOperationResult FileSystem::ReadJsonFromFile(const std::string& filePath, std::string& jsonStr)
+    {
+        try
+        {
+            if (!Exists(filePath))
+            {
+                return EM_JsonOperationResult::FileNotFound;
+            }
+
+            // 读取文件内容
+            jsonStr = ReadStringFromFile(filePath);
+            if (jsonStr.empty())
+            {
+                return EM_JsonOperationResult::ReadError;
+            }
+
+            // 验证JSON格式
+            if (!ValidateJsonString(jsonStr))
+            {
+                return EM_JsonOperationResult::InvalidJson;
+            }
+
+            return EM_JsonOperationResult::Success;
+        }
+        catch (const std::exception&)
+        {
+            return EM_JsonOperationResult::ReadError;
+        }
+    }
+
+    bool FileSystem::ValidateJsonString(const std::string& jsonStr)
+    {
+        try
+        {
+            std::stringstream ss(jsonStr);
+            boost::property_tree::ptree pt;
+            boost::property_tree::read_json(ss, pt);
+            return true;
+        }
+        catch (const std::exception&)
+        {
+            return false;
+        }
+    }
+
+    bool FileSystem::FormatJsonString(const std::string& jsonStr, std::string& formattedStr)
+    {
+        try
+        {
+            // 解析JSON
+            std::stringstream input(jsonStr);
+            boost::property_tree::ptree pt;
+            boost::property_tree::read_json(input, pt);
+
+            // 格式化输出
+            std::stringstream output;
+            boost::property_tree::write_json(output, pt, true);
+            formattedStr = output.str();
+
+            return true;
+        }
+        catch (const std::exception&)
+        {
+            return false;
+        }
+    }
+
+    bool FileSystem::IsAudioFile(const std::string& filePath)
+    {
+        std::string ext = GetExtension(filePath);
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        const std::vector<std::string> audioExts = GetSupportedAudioExtensions();
+        return std::find(audioExts.begin(), audioExts.end(), ext) != audioExts.end();
+    }
+
+    EM_AudioFileType FileSystem::GetAudioFileType(const std::string& filePath)
+    {
+        std::string ext = GetExtension(filePath);
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+        if (ext == ".mp3")
+        {
+            return EM_AudioFileType::MP3;
+        }
+        if (ext == ".wav")
+        {
+            return EM_AudioFileType::WAV;
+        }
+        if (ext == ".flac")
+        {
+            return EM_AudioFileType::FLAC;
+        }
+        if (ext == ".m4a")
+        {
+            return EM_AudioFileType::M4A;
+        }
+
+        return EM_AudioFileType::Unknown;
+    }
+
+    ST_AudioFileInfo FileSystem::GetAudioFileInfo(const std::string& filePath)
+    {
+        ST_AudioFileInfo info;
+        ST_FileInfo baseInfo = GetFileInfo(filePath);
+
+        // 复制基本信息
+        info.m_name = baseInfo.m_name;
+        info.m_path = baseInfo.m_path;
+        info.m_size = baseInfo.m_size;
+        info.m_createTime = baseInfo.m_createTime;
+        info.m_modifyTime = baseInfo.m_modifyTime;
+        info.m_accessTime = baseInfo.m_accessTime;
+        info.m_isDirectory = baseInfo.m_isDirectory;
+        info.m_isReadOnly = baseInfo.m_isReadOnly;
+
+        // 设置音频特有信息
+        info.m_fileType = GetAudioFileType(filePath);
+        info.m_displayName = GetFileNameWithoutExtension(filePath);
+        info.m_iconPath = ":/icons/audio.png"; // 默认图标
+
+        return info;
+    }
+
+    std::vector<std::string> FileSystem::GetAudioFiles(const std::string& dir, bool recursive)
+    {
+        std::vector<std::string> allFiles = GetFiles(dir, recursive);
+        std::vector<std::string> audioFiles;
+
+        for (const auto& file : allFiles)
+        {
+            if (IsAudioFile(file))
+            {
+                audioFiles.push_back(file);
+            }
+        }
+
+        return audioFiles;
+    }
+
+    std::vector<std::string> FileSystem::GetSupportedAudioExtensions()
+    {
+        return {".mp3", ".wav", ".flac", ".m4a"};
+    }
+
+    std::string FileSystem::GetAudioFileFilter()
+    {
+        return "音频文件 (*.mp3 *.wav *.flac *.m4a);;所有文件 (*.*)";
+    }
+
+    std::string FileSystem::QtPathToStdPath(const std::string& qtPath)
+    {
+        std::string stdPath = qtPath;
+        std::replace(stdPath.begin(), stdPath.end(), '/', '\\');
+        return stdPath;
+    }
+
+    std::string FileSystem::StdPathToQtPath(const std::string& stdPath)
+    {
+        std::string qtPath = stdPath;
+        std::replace(qtPath.begin(), qtPath.end(), '\\', '/');
+        return qtPath;
+    }
+
+    std::string FileSystem::EscapeJsonString(const std::string& str)
+    {
+        std::string result;
+        result.reserve(str.length() * 2);
+
+        for (size_t i = 0; i < str.length(); ++i)
+        {
+            char c = str[i];
+            if (c == '\\')
+            {
+                // 对于Windows路径，不要重复转义已经转义的反斜杠
+                if (i + 1 < str.length() && str[i + 1] == '\\')
+                {
+                    result += "\\\\";
+                    ++i; // 跳过下一个反斜杠
+                }
+                else
+                {
+                    result += "\\\\";
+                }
+            }
+            else if (c == '\"')
+            {
+                result += "\\\"";
+            }
+            else
+            {
+                result += c;
+            }
+        }
+        return result;
+    }
+
+    std::string FileSystem::UnescapeJsonString(const std::string& str)
+    {
+        std::string result;
+        result.reserve(str.length());
+
+        for (size_t i = 0; i < str.length(); ++i)
+        {
+            if (str[i] == '\\' && i + 1 < str.length())
+            {
+                char next = str[i + 1];
+                if (next == '\\')
+                {
+                    result += '\\';
+                    ++i; // 跳过下一个反斜杠
+                }
+                else if (next == '\"')
+                {
+                    result += '\"';
+                    ++i;
+                }
+                else
+                {
+                    result += str[i];
+                }
+            }
+            else
+            {
+                result += str[i];
+            }
+        }
+        return result;
     }
 }
