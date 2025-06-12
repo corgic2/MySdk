@@ -53,6 +53,30 @@ macro(source_group_by_dir source_files)
     endif(MSVC)
 endmacro(source_group_by_dir)
 
+# 定义复制头文件的宏
+macro(copy_headers_to_include source_dir dest_dir)
+    file(GLOB_RECURSE HEADER_FILES 
+        "${source_dir}/*.h"
+        "${source_dir}/*.hpp"
+        "${source_dir}/*.hxx"
+        "${source_dir}/*.H"
+    )
+    foreach(HEADER ${HEADER_FILES})
+        # 检查文件路径是否包含include目录
+        string(FIND ${HEADER} "/include/" INCLUDE_POS)
+        if(${INCLUDE_POS} EQUAL -1)
+            # 获取相对路径
+            file(RELATIVE_PATH REL_PATH ${source_dir} ${HEADER})
+            # 获取目标目录
+            get_filename_component(DEST_PATH ${dest_dir}/${REL_PATH} DIRECTORY)
+            # 创建目标目录
+            file(MAKE_DIRECTORY ${DEST_PATH})
+            # 复制文件
+            configure_file(${HEADER} ${dest_dir}/${REL_PATH} COPYONLY)
+        endif()
+    endforeach()
+endmacro()
+
 # 所有源文件
 file(GLOB_RECURSE SRC_FILE "*.cpp" "*.cxx" "*.cc" "*.C" "*.c++" "*.h" "*.hpp" "*.H" "*.hxx" "*.ui" "*.qrc" "*.ts")
 
@@ -71,6 +95,9 @@ add_library(${TARGET_NAME} SHARED ${TARGET_SRC})
 
 # 包含目录
 target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/include)
+
+# 调用复制头文件的宏
+copy_headers_to_include(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/include)
 
 # 设置Boost库的根目录（应指向 Boost 的安装根目录）
 set(BOOST_ROOT "D:/WorkSpace/boost_1_88_0")
