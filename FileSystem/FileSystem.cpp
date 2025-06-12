@@ -246,7 +246,7 @@ namespace my_sdk
         }
     }
 
-    bool FileSystem::CreateDirectory(const std::string& path)
+    bool FileSystem::CreateWindowsDirectory(const std::string& path)
     {
         try
         {

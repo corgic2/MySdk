@@ -122,7 +122,7 @@ namespace my_sdk
         /// </summary>
         /// <param name="path">目录路径</param>
         /// <returns>是否成功</returns>
-        static bool CreateDirectory(const std::string& path);
+        static bool CreateWindowsDirectory(const std::string& path);
 
         /// <summary>
         /// 判断文件或目录是否存在
