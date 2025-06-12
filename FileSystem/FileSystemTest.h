@@ -1,6 +1,8 @@
-﻿#pragma once
+#pragma once
 #include <iostream>
 #include <string>
+#include <QDir>
+#include <QTextCodec>
 #include "FileSystem.h"
 using namespace my_sdk;
 
@@ -8,6 +10,9 @@ void FileSystemTest()
 {
     try
     {
+        // 设置默认编码为UTF-8
+        QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
+
         // 测试路径和文件名
         std::string testDir = "../TestFiles";
         std::string testFile = testDir + "/testForFileSystem.txt";
@@ -87,10 +92,25 @@ void FileSystemTest()
         std::cout << "文件扩展名: " << FileSystem::GetExtension(testFile) << std::endl;
         std::cout << "不带扩展名的文件名: " << FileSystem::GetFileNameWithoutExtension(testFile) << std::endl;
 
+        // 10. 测试JSON操作
+        std::cout << "\n10. 测试JSON操作\n";
+        std::string jsonStr = R"({"name": "测试", "value": 123})";
+        std::string jsonFile = testDir + "/test.json";
+        
+        if (FileSystem::WriteJsonToFile(jsonFile, jsonStr, true) == EM_JsonOperationResult::Success)
+        {
+            std::cout << "JSON文件写入成功\n";
+            std::string readJson;
+            if (FileSystem::ReadJsonFromFile(jsonFile, readJson) == EM_JsonOperationResult::Success)
+            {
+                std::cout << "JSON文件读取成功: " << readJson << std::endl;
+            }
+        }
+
         std::cout << "\n=== 文件系统测试完成 ===\n";
     }
     catch (const std::exception& e)
     {
         std::cerr << "测试过程中发生错误: " << e.what() << std::endl;
     }
-}
+} 

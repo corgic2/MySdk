@@ -1,11 +1,4 @@
-﻿// ************************************************************
-// <remarks>
-// Author      : liaofeng
-// CreateTime  : 2025-01-07
-// Description : 文件系统工具类，Windows系统下
-// </remarks>
-// ************************************************************
-#pragma once
+﻿#pragma once
 #include <string>
 #include <vector>
 #include <ctime>
@@ -23,18 +16,6 @@ namespace my_sdk
         InvalidJson,        /// 无效的JSON格式
         WriteError,         /// 写入错误
         ReadError          /// 读取错误
-    };
-
-    /// <summary>
-    /// 音频文件类型枚举
-    /// </summary>
-    enum class EM_AudioFileType
-    {
-        Unknown,    /// 未知类型
-        MP3,        /// MP3格式
-        WAV,        /// WAV格式
-        FLAC,       /// FLAC格式
-        M4A         /// M4A格式
     };
 
     /// <summary>
@@ -61,23 +42,6 @@ namespace my_sdk
             , m_accessTime(0)
             , m_isDirectory(false)
             , m_isReadOnly(false)
-        {
-        }
-    };
-
-    /// <summary>
-    /// 音频文件信息结构体
-    /// </summary>
-    struct ST_AudioFileInfo : public ST_FileInfo
-    {
-        EM_AudioFileType m_fileType;     /// 音频文件类型
-        std::string m_displayName;        /// 显示名称
-        std::string m_iconPath;          /// 图标路径
-
-        /// <summary>
-        /// 构造函数
-        /// </summary>
-        ST_AudioFileInfo() : ST_FileInfo(), m_fileType(EM_AudioFileType::Unknown)
         {
         }
     };
@@ -245,47 +209,6 @@ namespace my_sdk
         static bool FormatJsonString(const std::string& jsonStr, std::string& formattedStr);
 
         /// <summary>
-        /// 判断文件是否为音频文件
-        /// </summary>
-        /// <param name="filePath">文件路径</param>
-        /// <returns>true表示是音频文件，false表示不是</returns>
-        static bool IsAudioFile(const std::string& filePath);
-
-        /// <summary>
-        /// 获取音频文件类型
-        /// </summary>
-        /// <param name="filePath">文件路径</param>
-        /// <returns>音频文件类型</returns>
-        static EM_AudioFileType GetAudioFileType(const std::string& filePath);
-
-        /// <summary>
-        /// 获取音频文件信息
-        /// </summary>
-        /// <param name="filePath">文件路径</param>
-        /// <returns>音频文件信息</returns>
-        static ST_AudioFileInfo GetAudioFileInfo(const std::string& filePath);
-
-        /// <summary>
-        /// 获取目录下所有音频文件
-        /// </summary>
-        /// <param name="dir">目录路径</param>
-        /// <param name="recursive">是否递归搜索子目录</param>
-        /// <returns>音频文件路径列表</returns>
-        static std::vector<std::string> GetAudioFiles(const std::string& dir, bool recursive = false);
-
-        /// <summary>
-        /// 获取支持的音频文件扩展名列表
-        /// </summary>
-        /// <returns>扩展名列表（包含点号，如 .mp3）</returns>
-        static std::vector<std::string> GetSupportedAudioExtensions();
-
-        /// <summary>
-        /// 获取音频文件过滤器（用于文件对话框）
-        /// </summary>
-        /// <returns>过滤器字符串</returns>
-        static std::string GetAudioFileFilter();
-
-        /// <summary>
         /// 将Qt路径转换为标准路径
         /// </summary>
         /// <param name="qtPath">Qt路径</param>
@@ -299,20 +222,6 @@ namespace my_sdk
         /// <returns>Qt路径</returns>
         static std::string StdPathToQtPath(const std::string& stdPath);
 
-        /// <summary>
-        /// 转义JSON字符串
-        /// </summary>
-        /// <param name="str">要转义的字符串</param>
-        /// <returns>转义后的字符串</returns>
-        static std::string EscapeJsonString(const std::string& str);
-
-        /// <summary>
-        /// 反转义JSON字符串
-        /// </summary>
-        /// <param name="str">要反转义的字符串</param>
-        /// <returns>反转义后的字符串</returns>
-        static std::string UnescapeJsonString(const std::string& str);
-
     private:
         /// <summary>
         /// 递归获取目录内容
@@ -320,8 +229,6 @@ namespace my_sdk
         /// <param name="dir">目录路径</param>
         /// <param name="files">文件列表</param>
         /// <param name="directories">目录列表</param>
-        static void GetDirectoryContents(const std::string& dir, 
-                                       std::vector<std::string>& files,
-                                       std::vector<std::string>& directories);
+        static void GetDirectoryContents(const std::string& dir, std::vector<std::string>& files, std::vector<std::string>& directories);
     };
-}
+} 

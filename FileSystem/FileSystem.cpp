@@ -1,17 +1,24 @@
 ﻿#include "FileSystem.h"
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QTextCodec>
+#include <QDateTime>
+#include <QTextStream>
+#include <algorithm>
+#include <ctime>
 #include <fstream>
 #include <iostream>
-#include <boost/filesystem.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <sys/stat.h>
-#include <ctime>
-#include <algorithm>
+#include "SDKCommonDefine/SDKCommonDefine.h"
 
 namespace my_sdk
 {
     FileSystem::FileSystem()
     {
+        // 设置全局的文本编码为UTF-8
+        QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
     }
 
     FileSystem::~FileSystem()
@@ -23,22 +30,28 @@ namespace my_sdk
         try
         {
             // 确保父目录存在
-            boost::filesystem::path path(filePath);
-            boost::filesystem::create_directories(path.parent_path());
+            QFileInfo fileInfo(QString::fromUtf8(filePath.c_str()));
+            QDir dir = fileInfo.dir();
+            if (!dir.exists())
+            {
+                dir.mkpath(".");
+            }
 
             // 写入内容
-            std::ofstream file(filePath, std::ios::binary);
-            if (!file.is_open())
+            QFile file(QString::fromUtf8(filePath.c_str()));
+            if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
             {
                 return false;
             }
-            // 可选写入BOM
+
+            QTextStream out(&file);
+            // 设置文本流编码为UTF-8
+            out.setCodec("UTF-8");
             if (writeBom)
             {
-                const char bom[] = "\xEF\xBB\xBF";
-                file.write(bom, 3);
+                out.setGenerateByteOrderMark(true);
             }
-            file << str;
+            out << QString::fromUtf8(str.c_str());
             file.close();
             return true;
         }
@@ -52,30 +65,41 @@ namespace my_sdk
     {
         try
         {
-            if (!boost::filesystem::exists(filePath))
+            QFile file(QString::fromUtf8(filePath.c_str()));
+            if (!file.exists() || !file.open(QIODevice::ReadOnly | QIODevice::Text))
             {
                 return "";
             }
 
-            std::ifstream file(filePath, std::ios::binary);
-            if (!file.is_open())
-            {
-                return "";
-            }
-            // 读取全部内容到缓冲区
-            std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+            QTextStream in(&file);
+            // 设置文本流编码为UTF-8
+            in.setCodec("UTF-8");
+            QString content = in.readAll();
+            file.close();
 
-            // 安全移除BOM
-            if (removeBOM && content.size() >= 3 && static_cast<uint8_t>(content[0]) == 0xEF && static_cast<uint8_t>(content[1]) == 0xBB && static_cast<uint8_t>(content[2]) == 0xBF)
-            {
-                content.erase(0, 3);
-            }
-
-            return content;
+            return content.toUtf8().constData();
         }
         catch (const std::exception&)
         {
             return "";
+        }
+    }
+
+    std::string FileSystem::ConvertEncodingToUtf_8(const std::string& input, const std::string& to)
+    {
+        try
+        {
+            QTextCodec* codec = QTextCodec::codecForName(to.c_str());
+            if (!codec)
+            {
+                return input;
+            }
+            QString text = codec->toUnicode(input.c_str());
+            return text.toUtf8().constData();
+        }
+        catch (const std::exception&)
+        {
+            return input;
         }
     }
 
@@ -84,28 +108,25 @@ namespace my_sdk
         ST_FileInfo info;
         try
         {
-            boost::filesystem::path fsPath(path);
-            if (!boost::filesystem::exists(fsPath))
+            QFileInfo fileInfo(QString::fromUtf8(path.c_str()));
+            if (!fileInfo.exists())
             {
                 return info;
             }
 
-            info.m_name = fsPath.filename().string();
-            info.m_path = fsPath.string();
-            info.m_isDirectory = boost::filesystem::is_directory(fsPath);
-
-            boost::filesystem::file_status status = boost::filesystem::status(fsPath);
-            info.m_isReadOnly = (status.permissions() & boost::filesystem::perms::owner_write) == boost::filesystem::perms::no_perms;
+            info.m_name = fileInfo.fileName().toUtf8().constData();
+            info.m_path = fileInfo.absoluteFilePath().toUtf8().constData();
+            info.m_isDirectory = fileInfo.isDir();
+            info.m_isReadOnly = !fileInfo.isWritable();
 
             if (!info.m_isDirectory)
             {
-                info.m_size = boost::filesystem::file_size(fsPath);
+                info.m_size = fileInfo.size();
             }
 
-            std::time_t ctime = boost::filesystem::last_write_time(fsPath);
-            info.m_createTime = ctime;
-            info.m_modifyTime = ctime;
-            info.m_accessTime = ctime;
+            info.m_createTime = fileInfo.birthTime().toSecsSinceEpoch();
+            info.m_modifyTime = fileInfo.lastModified().toSecsSinceEpoch();
+            info.m_accessTime = fileInfo.lastRead().toSecsSinceEpoch();
         }
         catch (const std::exception&)
         {
@@ -117,36 +138,51 @@ namespace my_sdk
     {
         try
         {
-            boost::filesystem::path srcPath(source);
-            boost::filesystem::path destPath(destination);
+            QString srcPath = QString::fromUtf8(source.c_str());
+            QString destPath = QString::fromUtf8(destination.c_str());
 
-            if (!boost::filesystem::exists(srcPath))
+            QFileInfo srcInfo(srcPath);
+            if (!srcInfo.exists())
             {
                 return false;
             }
 
-            if (boost::filesystem::exists(destPath) && !overwrite)
+            QFileInfo destInfo(destPath);
+            if (destInfo.exists() && !overwrite)
             {
                 return false;
             }
 
-            if (boost::filesystem::is_directory(srcPath))
+            if (srcInfo.isDir())
             {
-                boost::filesystem::create_directories(destPath);
-                for (boost::filesystem::directory_iterator file(srcPath); file != boost::filesystem::directory_iterator(); ++file)
+                QDir dir;
+                if (!dir.mkpath(destPath))
                 {
-                    boost::filesystem::path current(file->path());
-                    boost::filesystem::path target = destPath / current.filename();
-                    Copy(current.string(), target.string(), overwrite);
+                    return false;
+                }
+
+                QDir sourceDir(srcPath);
+                QStringList files = sourceDir.entryList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+                for (const QString& file : files)
+                {
+                    QString srcFilePath = srcPath + "/" + file;
+                    QString destFilePath = destPath + "/" + file;
+                    if (!Copy(srcFilePath.toUtf8().constData(), destFilePath.toUtf8().constData(), overwrite))
+                    {
+                        return false;
+                    }
                 }
             }
             else
             {
-                if (overwrite && boost::filesystem::exists(destPath))
+                if (destInfo.exists() && overwrite)
                 {
-                    boost::filesystem::remove(destPath);
+                    QFile::remove(destPath);
                 }
-                boost::filesystem::copy_file(srcPath, destPath);
+                if (!QFile::copy(srcPath, destPath))
+                {
+                    return false;
+                }
             }
             return true;
         }
@@ -160,10 +196,16 @@ namespace my_sdk
     {
         try
         {
-            boost::filesystem::path srcPath(source);
-            boost::filesystem::path destPath(destination);
-            boost::filesystem::rename(srcPath, destPath);
-            return true;
+            QString srcPath = QString::fromUtf8(source.c_str());
+            QString destPath = QString::fromUtf8(destination.c_str());
+
+            QFile file(srcPath);
+            if (!file.exists())
+            {
+                return false;
+            }
+
+            return file.rename(destPath);
         }
         catch (const std::exception&)
         {
@@ -180,13 +222,23 @@ namespace my_sdk
     {
         try
         {
-            boost::filesystem::path fsPath(path);
-            if (!boost::filesystem::exists(fsPath))
+            QString qPath = QString::fromUtf8(path.c_str());
+            QFileInfo fileInfo(qPath);
+            if (!fileInfo.exists())
             {
                 return true;
             }
-            boost::filesystem::remove_all(fsPath);
-            return true;
+
+            if (fileInfo.isDir())
+            {
+                QDir dir(qPath);
+                return dir.removeRecursively();
+            }
+            else
+            {
+                QFile file(qPath);
+                return file.remove();
+            }
         }
         catch (const std::exception&)
         {
@@ -198,7 +250,8 @@ namespace my_sdk
     {
         try
         {
-            return boost::filesystem::create_directories(path);
+            QDir dir;
+            return dir.mkpath(QString::fromUtf8(path.c_str()));
         }
         catch (const std::exception&)
         {
@@ -210,7 +263,7 @@ namespace my_sdk
     {
         try
         {
-            return boost::filesystem::exists(path);
+            return QFileInfo::exists(QString::fromUtf8(path.c_str()));
         }
         catch (const std::exception&)
         {
@@ -222,10 +275,10 @@ namespace my_sdk
     {
         try
         {
-            boost::filesystem::path fsPath(path);
-            if (boost::filesystem::exists(fsPath) && !boost::filesystem::is_directory(fsPath))
+            QFileInfo fileInfo(QString::fromUtf8(path.c_str()));
+            if (fileInfo.exists() && fileInfo.isFile())
             {
-                return boost::filesystem::file_size(fsPath);
+                return fileInfo.size();
             }
         }
         catch (const std::exception&)
@@ -237,28 +290,28 @@ namespace my_sdk
     std::vector<std::string> FileSystem::GetFiles(const std::string& dir, bool recursive)
     {
         std::vector<std::string> files;
-        std::vector<std::string> directories;
-
         try
         {
+            QDir directory(QString::fromUtf8(dir.c_str()));
+            if (!directory.exists())
+            {
+                return files;
+            }
+
+            QStringList entries = directory.entryList(QDir::Files);
+            for (const QString& entry : entries)
+            {
+                files.push_back(directory.absoluteFilePath(entry).toUtf8().constData());
+            }
+
             if (recursive)
             {
-                GetDirectoryContents(dir, files, directories);
-            }
-            else
-            {
-                boost::filesystem::path dirPath(dir);
-                if (!boost::filesystem::exists(dirPath) || !boost::filesystem::is_directory(dirPath))
+                QStringList subdirs = directory.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+                for (const QString& subdir : subdirs)
                 {
-                    return files;
-                }
-
-                for (boost::filesystem::directory_iterator it(dirPath); it != boost::filesystem::directory_iterator(); ++it)
-                {
-                    if (boost::filesystem::is_regular_file(it->path()))
-                    {
-                        files.push_back(it->path().string());
-                    }
+                    QString subdirPath = directory.absoluteFilePath(subdir);
+                    std::vector<std::string> subFiles = GetFiles(subdirPath.toUtf8().constData(), true);
+                    files.insert(files.end(), subFiles.begin(), subFiles.end());
                 }
             }
         }
@@ -270,29 +323,28 @@ namespace my_sdk
 
     std::vector<std::string> FileSystem::GetDirectories(const std::string& dir, bool recursive)
     {
-        std::vector<std::string> files;
         std::vector<std::string> directories;
-
         try
         {
+            QDir directory(QString::fromUtf8(dir.c_str()));
+            if (!directory.exists())
+            {
+                return directories;
+            }
+
+            QStringList entries = directory.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+            for (const QString& entry : entries)
+            {
+                directories.push_back(directory.absoluteFilePath(entry).toUtf8().constData());
+            }
+
             if (recursive)
             {
-                GetDirectoryContents(dir, files, directories);
-            }
-            else
-            {
-                boost::filesystem::path dirPath(dir);
-                if (!boost::filesystem::exists(dirPath) || !boost::filesystem::is_directory(dirPath))
+                for (const QString& subdir : entries)
                 {
-                    return directories;
-                }
-
-                for (boost::filesystem::directory_iterator it(dirPath); it != boost::filesystem::directory_iterator(); ++it)
-                {
-                    if (boost::filesystem::is_directory(it->path()))
-                    {
-                        directories.push_back(it->path().string());
-                    }
+                    QString subdirPath = directory.absoluteFilePath(subdir);
+                    std::vector<std::string> subdirs = GetDirectories(subdirPath.toUtf8().constData(), true);
+                    directories.insert(directories.end(), subdirs.begin(), subdirs.end());
                 }
             }
         }
@@ -306,18 +358,23 @@ namespace my_sdk
     {
         try
         {
-            boost::filesystem::path fsPath(path);
-            if (!boost::filesystem::exists(fsPath))
+            QFile file(QString::fromUtf8(path.c_str()));
+            if (!file.exists())
             {
                 return false;
             }
 
-            boost::filesystem::permissions(fsPath, 
-                readOnly ? boost::filesystem::perms::owner_read | boost::filesystem::perms::group_read | boost::filesystem::perms::others_read
-                        : boost::filesystem::perms::owner_read | boost::filesystem::perms::owner_write |
-                          boost::filesystem::perms::group_read | boost::filesystem::perms::group_write |
-                          boost::filesystem::perms::others_read | boost::filesystem::perms::others_write);
-            return true;
+            QFile::Permissions permissions = file.permissions();
+            if (readOnly)
+            {
+                permissions &= ~(QFile::WriteOwner | QFile::WriteUser | QFile::WriteGroup | QFile::WriteOther);
+            }
+            else
+            {
+                permissions |= (QFile::WriteOwner | QFile::WriteUser);
+            }
+
+            return file.setPermissions(permissions);
         }
         catch (const std::exception&)
         {
@@ -329,7 +386,8 @@ namespace my_sdk
     {
         try
         {
-            return boost::filesystem::path(path).extension().string();
+            QFileInfo fileInfo(QString::fromUtf8(path.c_str()));
+            return fileInfo.suffix().toUtf8().constData();
         }
         catch (const std::exception&)
         {
@@ -341,7 +399,8 @@ namespace my_sdk
     {
         try
         {
-            return boost::filesystem::path(path).stem().string();
+            QFileInfo fileInfo(QString::fromUtf8(path.c_str()));
+            return fileInfo.baseName().toUtf8().constData();
         }
         catch (const std::exception&)
         {
@@ -349,49 +408,22 @@ namespace my_sdk
         }
     }
 
-    void FileSystem::GetDirectoryContents(const std::string& dir, std::vector<std::string>& files, std::vector<std::string>& directories)
-    {
-        try
-        {
-            boost::filesystem::path dirPath(dir);
-            if (!boost::filesystem::exists(dirPath) || !boost::filesystem::is_directory(dirPath))
-            {
-                return;
-            }
-
-            for (boost::filesystem::recursive_directory_iterator it(dirPath); it != boost::filesystem::recursive_directory_iterator(); ++it)
-            {
-                if (boost::filesystem::is_regular_file(it->path()))
-                {
-                    files.push_back(it->path().string());
-                }
-                else if (boost::filesystem::is_directory(it->path()))
-                {
-                    directories.push_back(it->path().string());
-                }
-            }
-        }
-        catch (const std::exception&)
-        {
-        }
-    }
-
     void FileSystem::ListDirectory(const std::string& dir)
     {
         try
         {
-            boost::filesystem::path dirPath(dir);
-            if (!boost::filesystem::exists(dirPath) || !boost::filesystem::is_directory(dirPath))
+            QDir directory(QString::fromUtf8(dir.c_str()));
+            if (!directory.exists())
             {
                 throw std::runtime_error("目录无效: " + dir);
             }
 
             std::cout << "目录内容 (" << dir << "):\n";
-            for (const auto& entry : boost::filesystem::directory_iterator(dirPath))
+            QFileInfoList entries = directory.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot);
+            for (const QFileInfo& entry : entries)
             {
-                const auto& path = entry.path();
-                std::string type = boost::filesystem::is_directory(path) ? "[目录]" : boost::filesystem::is_regular_file(path) ? "[文件]" : "[其他]";
-                std::cout << "  " << type << " " << path.filename() << "\n";
+                QString type = entry.isDir() ? "[目录]" : entry.isFile() ? "[文件]" : "[其他]";
+                std::cout << "  " << type.toUtf8().constData() << " " << entry.fileName().toUtf8().constData() << "\n";
             }
         }
         catch (const std::exception& e)
@@ -400,10 +432,33 @@ namespace my_sdk
         }
     }
 
-    std::string FileSystem::ConvertEncodingToUtf_8(const std::string& input, const std::string& to)
+    void FileSystem::GetDirectoryContents(const std::string& dir, std::vector<std::string>& files, std::vector<std::string>& directories)
     {
-        // TODO: 实现编码转换功能
-        return input;
+        try
+        {
+            QDir directory(QString::fromUtf8(dir.c_str()));
+            if (!directory.exists())
+            {
+                return;
+            }
+
+            QFileInfoList entries = directory.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot);
+            for (const QFileInfo& entry : entries)
+            {
+                if (entry.isFile())
+                {
+                    files.push_back(entry.absoluteFilePath().toUtf8().constData());
+                }
+                else if (entry.isDir())
+                {
+                    directories.push_back(entry.absoluteFilePath().toUtf8().constData());
+                    GetDirectoryContents(entry.absoluteFilePath().toUtf8().constData(), files, directories);
+                }
+            }
+        }
+        catch (const std::exception&)
+        {
+        }
     }
 
     EM_JsonOperationResult FileSystem::WriteJsonToFile(const std::string& filePath, const std::string& jsonStr, bool pretty)
@@ -416,29 +471,26 @@ namespace my_sdk
                 return EM_JsonOperationResult::InvalidJson;
             }
 
-            // 确保父目录存在
-            boost::filesystem::path path(filePath);
-            boost::filesystem::create_directories(path.parent_path());
-
-            // 如果需要格式化
-            std::string outputStr;
-            if (pretty)
+            // 将std::string转换为QString时显式指定UTF-8编码
+            QString jsonQStr = QString::fromUtf8(jsonStr.c_str());
+            QJsonDocument doc = QJsonDocument::fromJson(jsonQStr.toUtf8());
+            if (doc.isNull())
             {
-                if (!FormatJsonString(jsonStr, outputStr))
-                {
-                    return EM_JsonOperationResult::InvalidJson;
-                }
-            }
-            else
-            {
-                outputStr = jsonStr;
+                return EM_JsonOperationResult::InvalidJson;
             }
 
-            // 写入文件
-            if (!WriteStringToFile(filePath, outputStr))
+            QFile file(QString::fromUtf8(filePath.c_str()));
+            if (!file.open(QIODevice::WriteOnly | QIODevice::Text))  // 添加Text标志以确保正确的换行符
             {
                 return EM_JsonOperationResult::WriteError;
             }
+
+            // 使用QTextStream确保正确的UTF-8编码输出
+            QTextStream out(&file);
+            out.setCodec("UTF-8");
+            out.setGenerateByteOrderMark(true);  // 添加UTF-8 BOM
+            out << doc.toJson(pretty ? QJsonDocument::Indented : QJsonDocument::Compact);
+            file.close();
 
             return EM_JsonOperationResult::Success;
         }
@@ -452,24 +504,31 @@ namespace my_sdk
     {
         try
         {
-            if (!Exists(filePath))
+            QFile file(QString::fromUtf8(filePath.c_str()));
+            if (!file.exists())
             {
                 return EM_JsonOperationResult::FileNotFound;
             }
 
-            // 读取文件内容
-            jsonStr = ReadStringFromFile(filePath);
-            if (jsonStr.empty())
+            if (!file.open(QIODevice::ReadOnly | QIODevice::Text))  // 添加Text标志以确保正确的换行符
             {
                 return EM_JsonOperationResult::ReadError;
             }
 
-            // 验证JSON格式
-            if (!ValidateJsonString(jsonStr))
+            // 使用QTextStream确保正确的UTF-8编码读取
+            QTextStream in(&file);
+            in.setCodec("UTF-8");
+            QString jsonQStr = in.readAll();
+            file.close();
+
+            QJsonDocument doc = QJsonDocument::fromJson(jsonQStr.toUtf8());
+            if (doc.isNull())
             {
                 return EM_JsonOperationResult::InvalidJson;
             }
 
+            // 确保输出的字符串是UTF-8编码
+            jsonStr = jsonQStr.toUtf8().constData();
             return EM_JsonOperationResult::Success;
         }
         catch (const std::exception&)
@@ -482,10 +541,8 @@ namespace my_sdk
     {
         try
         {
-            std::stringstream ss(jsonStr);
-            boost::property_tree::ptree pt;
-            boost::property_tree::read_json(ss, pt);
-            return true;
+            QJsonDocument doc = QJsonDocument::fromJson(QString::fromUtf8(jsonStr.c_str()).toUtf8());
+            return !doc.isNull();
         }
         catch (const std::exception&)
         {
@@ -497,16 +554,13 @@ namespace my_sdk
     {
         try
         {
-            // 解析JSON
-            std::stringstream input(jsonStr);
-            boost::property_tree::ptree pt;
-            boost::property_tree::read_json(input, pt);
+            QJsonDocument doc = QJsonDocument::fromJson(QString::fromUtf8(jsonStr.c_str()).toUtf8());
+            if (doc.isNull())
+            {
+                return false;
+            }
 
-            // 格式化输出
-            std::stringstream output;
-            boost::property_tree::write_json(output, pt, true);
-            formattedStr = output.str();
-
+            formattedStr = QString(doc.toJson(QJsonDocument::Indented)).toUtf8().constData();
             return true;
         }
         catch (const std::exception&)
@@ -515,165 +569,33 @@ namespace my_sdk
         }
     }
 
-    bool FileSystem::IsAudioFile(const std::string& filePath)
-    {
-        std::string ext = GetExtension(filePath);
-        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-        const std::vector<std::string> audioExts = GetSupportedAudioExtensions();
-        return std::find(audioExts.begin(), audioExts.end(), ext) != audioExts.end();
-    }
-
-    EM_AudioFileType FileSystem::GetAudioFileType(const std::string& filePath)
-    {
-        std::string ext = GetExtension(filePath);
-        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-        if (ext == ".mp3")
-        {
-            return EM_AudioFileType::MP3;
-        }
-        if (ext == ".wav")
-        {
-            return EM_AudioFileType::WAV;
-        }
-        if (ext == ".flac")
-        {
-            return EM_AudioFileType::FLAC;
-        }
-        if (ext == ".m4a")
-        {
-            return EM_AudioFileType::M4A;
-        }
-
-        return EM_AudioFileType::Unknown;
-    }
-
-    ST_AudioFileInfo FileSystem::GetAudioFileInfo(const std::string& filePath)
-    {
-        ST_AudioFileInfo info;
-        ST_FileInfo baseInfo = GetFileInfo(filePath);
-
-        // 复制基本信息
-        info.m_name = baseInfo.m_name;
-        info.m_path = baseInfo.m_path;
-        info.m_size = baseInfo.m_size;
-        info.m_createTime = baseInfo.m_createTime;
-        info.m_modifyTime = baseInfo.m_modifyTime;
-        info.m_accessTime = baseInfo.m_accessTime;
-        info.m_isDirectory = baseInfo.m_isDirectory;
-        info.m_isReadOnly = baseInfo.m_isReadOnly;
-
-        // 设置音频特有信息
-        info.m_fileType = GetAudioFileType(filePath);
-        info.m_displayName = GetFileNameWithoutExtension(filePath);
-        info.m_iconPath = ":/icons/audio.png"; // 默认图标
-
-        return info;
-    }
-
-    std::vector<std::string> FileSystem::GetAudioFiles(const std::string& dir, bool recursive)
-    {
-        std::vector<std::string> allFiles = GetFiles(dir, recursive);
-        std::vector<std::string> audioFiles;
-
-        for (const auto& file : allFiles)
-        {
-            if (IsAudioFile(file))
-            {
-                audioFiles.push_back(file);
-            }
-        }
-
-        return audioFiles;
-    }
-
-    std::vector<std::string> FileSystem::GetSupportedAudioExtensions()
-    {
-        return {".mp3", ".wav", ".flac", ".m4a"};
-    }
-
-    std::string FileSystem::GetAudioFileFilter()
-    {
-        return "音频文件 (*.mp3 *.wav *.flac *.m4a);;所有文件 (*.*)";
-    }
-
     std::string FileSystem::QtPathToStdPath(const std::string& qtPath)
     {
-        std::string stdPath = qtPath;
-        std::replace(stdPath.begin(), stdPath.end(), '/', '\\');
-        return stdPath;
+        try
+        {
+            QString path = QString::fromUtf8(qtPath.c_str());
+            std::string stdPath = path.toUtf8().constData();
+            std::replace(stdPath.begin(), stdPath.end(), '/', '\\');
+            return stdPath;
+        }
+        catch (const std::exception&)
+        {
+            return qtPath;
+        }
     }
 
     std::string FileSystem::StdPathToQtPath(const std::string& stdPath)
     {
-        std::string qtPath = stdPath;
-        std::replace(qtPath.begin(), qtPath.end(), '\\', '/');
-        return qtPath;
-    }
-
-    std::string FileSystem::EscapeJsonString(const std::string& str)
-    {
-        std::string result;
-        result.reserve(str.length() * 2);
-
-        for (size_t i = 0; i < str.length(); ++i)
+        try
         {
-            char c = str[i];
-            if (c == '\\')
-            {
-                // 对于Windows路径，不要重复转义已经转义的反斜杠
-                if (i + 1 < str.length() && str[i + 1] == '\\')
-                {
-                    result += "\\\\";
-                    ++i; // 跳过下一个反斜杠
-                }
-                else
-                {
-                    result += "\\\\";
-                }
-            }
-            else if (c == '\"')
-            {
-                result += "\\\"";
-            }
-            else
-            {
-                result += c;
-            }
+            QString path = QString::fromUtf8(stdPath.c_str());
+            std::string qtPath = path.toUtf8().constData();
+            std::replace(qtPath.begin(), qtPath.end(), '\\', '/');
+            return qtPath;
         }
-        return result;
-    }
-
-    std::string FileSystem::UnescapeJsonString(const std::string& str)
-    {
-        std::string result;
-        result.reserve(str.length());
-
-        for (size_t i = 0; i < str.length(); ++i)
+        catch (const std::exception&)
         {
-            if (str[i] == '\\' && i + 1 < str.length())
-            {
-                char next = str[i + 1];
-                if (next == '\\')
-                {
-                    result += '\\';
-                    ++i; // 跳过下一个反斜杠
-                }
-                else if (next == '\"')
-                {
-                    result += '\"';
-                    ++i;
-                }
-                else
-                {
-                    result += str[i];
-                }
-            }
-            else
-            {
-                result += str[i];
-            }
+            return stdPath;
         }
-        return result;
     }
 }

@@ -10,6 +10,17 @@ set(TARGET_NAME SDK)
 # 设置启动项目
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT SDK)
 
+# 设置使用到的Qt模块 ------------------------------------------------------------------
+set(QT_MODULES Core Gui Widgets)
+
+# 查找 Qt 库（以 Qt5 为例）
+find_package(Qt5 COMPONENTS ${QT_MODULES} REQUIRED)
+
+# Qt，开启Qt代码自动生成
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+
 # 检测平台（x86 或 x64）
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(PLATFORM_CPU "x64")
@@ -98,6 +109,12 @@ target_include_directories(${TARGET_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
 # 调用复制头文件的宏
 copy_headers_to_include(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/include)
+
+# 链接Qt库
+target_link_libraries(${TARGET_NAME} PUBLIC
+  Qt5::Core 
+  Qt5::Gui
+)
 
 # 设置Boost库的根目录（应指向 Boost 的安装根目录）
 set(BOOST_ROOT "D:/WorkSpace/boost_1_88_0")
