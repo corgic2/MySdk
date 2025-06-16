@@ -7,6 +7,7 @@ ThreadPool::ThreadPool(const ST_ThreadPoolConfig& config)
     , m_totalThreads(0)
     , m_activeThreads(0)
     , m_adjusting(false)
+    , m_nextThreadId(0)
 {
     for (size_t i = 0; i < m_config.m_minThreads; ++i)
     {
@@ -23,6 +24,29 @@ ThreadPool::~ThreadPool()
             Shutdown();
         }
         catch (...) {}
+    }
+
+    // 清理所有专用线程
+    std::vector<std::shared_ptr<ST_DedicatedThreadInfo>> threadsToStop;
+    {
+        std::lock_guard<std::mutex> lock(m_dedicatedThreadsMutex);
+        for (const auto& pair : m_dedicatedThreads)
+        {
+            threadsToStop.push_back(pair.second);
+        }
+    }
+
+    for (auto& threadInfo : threadsToStop)
+    {
+        {
+            std::lock_guard<std::mutex> lock(threadInfo->m_mutex);
+            threadInfo->m_stop = true;
+        }
+        threadInfo->m_condition.notify_all();
+        if (threadInfo->m_thread.joinable())
+        {
+            threadInfo->m_thread.join();
+        }
     }
 }
 
@@ -204,4 +228,103 @@ void ThreadPool::CreateWorkerThread()
     std::lock_guard<std::mutex> lock(m_workersMutex);
     ++m_totalThreads;
     m_workers.emplace_back(&ThreadPool::WorkerThread, this);
+}
+
+size_t ThreadPool::CreateDedicatedThread(const std::string& name, std::function<void()> task)
+{
+    auto threadInfo = std::make_shared<ST_DedicatedThreadInfo>();
+    threadInfo->m_name = name;
+    threadInfo->m_task = std::move(task);
+    threadInfo->m_state = EM_DedicatedThreadState::Running;
+    threadInfo->m_stop = false;
+
+    size_t threadId = m_nextThreadId++;
+    {
+        std::lock_guard<std::mutex> lock(m_dedicatedThreadsMutex);
+        m_dedicatedThreads[threadId] = threadInfo;
+    }
+
+    threadInfo->m_thread = std::thread(&ThreadPool::DedicatedThreadWorker, this, threadInfo);
+    return threadId;
+}
+
+bool ThreadPool::StopDedicatedThread(size_t threadId)
+{
+    std::shared_ptr<ST_DedicatedThreadInfo> threadInfo;
+    {
+        std::lock_guard<std::mutex> lock(m_dedicatedThreadsMutex);
+        auto it = m_dedicatedThreads.find(threadId);
+        if (it == m_dedicatedThreads.end())
+        {
+            return false;
+        }
+        threadInfo = it->second;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(threadInfo->m_mutex);
+        threadInfo->m_stop = true;
+    }
+    threadInfo->m_condition.notify_all();
+
+    if (threadInfo->m_thread.joinable())
+    {
+        threadInfo->m_thread.join();
+    }
+
+    threadInfo->m_state = EM_DedicatedThreadState::Stopped;
+    return true;
+}
+
+EM_DedicatedThreadState ThreadPool::GetDedicatedThreadState(size_t threadId) const
+{
+    std::lock_guard<std::mutex> lock(m_dedicatedThreadsMutex);
+    auto it = m_dedicatedThreads.find(threadId);
+    if (it == m_dedicatedThreads.end())
+    {
+        return EM_DedicatedThreadState::Stopped;
+    }
+    return it->second->m_state;
+}
+
+std::vector<std::pair<size_t, ST_DedicatedThreadInfo>> ThreadPool::GetAllDedicatedThreads() const
+{
+    std::vector<std::pair<size_t, ST_DedicatedThreadInfo>> result;
+    std::lock_guard<std::mutex> lock(m_dedicatedThreadsMutex);
+    for (const auto& pair : m_dedicatedThreads)
+    {
+        result.emplace_back(pair.first, std::move(*pair.second));
+    }
+    return result;
+}
+
+void ThreadPool::DedicatedThreadWorker(std::shared_ptr<ST_DedicatedThreadInfo> threadInfo)
+{
+    try
+    {
+        while (true)
+        {
+            {
+                std::unique_lock<std::mutex> lock(threadInfo->m_mutex);
+                if (threadInfo->m_stop)
+                {
+                    break;
+                }
+            }
+
+            threadInfo->m_task();
+
+            {
+                std::unique_lock<std::mutex> lock(threadInfo->m_mutex);
+                if (threadInfo->m_stop)
+                {
+                    break;
+                }
+            }
+        }
+    }
+    catch (...)
+    {
+        threadInfo->m_state = EM_DedicatedThreadState::Error;
+    }
 }

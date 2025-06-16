@@ -332,8 +332,13 @@ private:
 /// <summary>
 /// 日志宏定义，提供便捷的日志记录接口
 /// </summary>
-#define LOG_DEBUG(format, ...) LogSystem::Instance().WriteLogFormat(EM_LogLevel::Debug, format, __FILE__, __LINE__, ##__VA_ARGS__)
-#define LOG_INFO(format, ...) LogSystem::Instance().WriteLogFormat(EM_LogLevel::Info, format, __FILE__, __LINE__, ##__VA_ARGS__)
-#define LOG_WARN(format, ...) LogSystem::Instance().WriteLogFormat(EM_LogLevel::Warning, format, __FILE__, __LINE__, ##__VA_ARGS__)
-#define LOG_ERROR(format, ...) LogSystem::Instance().WriteLogFormat(EM_LogLevel::Error, format, __FILE__, __LINE__, ##__VA_ARGS__)
-#define LOG_FATAL(format, ...) LogSystem::Instance().WriteLogFormat(EM_LogLevel::Fatal, format, __FILE__, __LINE__, ##__VA_ARGS__)
+#define LOG_DEBUG(message, ...) LogSystem::Instance().WriteLog(EM_LogLevel::Debug, message)
+#define LOG_INFO(message, ...) LogSystem::Instance().WriteLog(EM_LogLevel::Info, message)
+#define LOG_WARN(message, ...) LogSystem::Instance().WriteLog(EM_LogLevel::Warning, message)
+#define LOG_ERROR(message, ...) LogSystem::Instance().WriteLog(EM_LogLevel::Error, message)
+#define LOG_FATAL(message, ...) LogSystem::Instance().WriteLog(EM_LogLevel::Fatal, message)
+#define LOG_DEBUG_FORMAT(format, ...) LogSystem::Instance().WriteLogFormat(EM_LogLevel::Debug, format, __FILE__, __LINE__, __VA_ARGS__)
+#define LOG_INFO_FORMAT(format, ...) LogSystem::Instance().WriteLogFormat(EM_LogLevel::Info, format, __FILE__, __LINE__, __VA_ARGS__)
+#define LOG_WARN_FORMAT(format, ...) LogSystem::Instance().WriteLogFormat(EM_LogLevel::Warning, format, __FILE__, __LINE__, __VA_ARGS__)
+#define LOG_ERROR_FORMAT(format, ...) LogSystem::Instance().WriteLogFormat(EM_LogLevel::Error, format, __FILE__, __LINE__, __VA_ARGS__)
+#define LOG_FATAL_FORMAT(format, ...) LogSystem::Instance().WriteLogFormat(EM_LogLevel::Fatal, format, __FILE__, __LINE__, __VA_ARGS__)

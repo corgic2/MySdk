@@ -16,6 +16,7 @@
 #include "../SDKCommonDefine/SDK_Export.h"
 #include <shared_mutex>
 #include <array>
+#include <unordered_map>
 
 /// <summary>
 /// 线程池任务优先级枚举
@@ -136,6 +137,67 @@ public:
 };
 
 /// <summary>
+/// 专用线程状态枚举
+/// </summary>
+enum class EM_DedicatedThreadState
+{
+    Running,    ///< 运行中
+    Stopped,    ///< 已停止
+    Error       ///< 发生错误
+};
+
+/// <summary>
+/// 专用线程信息结构体
+/// </summary>
+struct ST_DedicatedThreadInfo
+{
+    std::thread m_thread;                    ///< 线程对象
+    std::atomic<EM_DedicatedThreadState> m_state{EM_DedicatedThreadState::Running}; ///< 线程状态
+    std::string m_name;                      ///< 线程名称
+    std::function<void()> m_task;            ///< 任务函数
+    std::mutex m_mutex;                      ///< 互斥锁
+    std::condition_variable m_condition;     ///< 条件变量
+    bool m_stop{false};                      ///< 停止标志
+
+    /// <summary>
+    /// 默认构造函数
+    /// </summary>
+    ST_DedicatedThreadInfo() = default;
+
+    /// <summary>
+    /// 移动构造函数
+    /// </summary>
+    ST_DedicatedThreadInfo(ST_DedicatedThreadInfo&& other) noexcept
+        : m_thread(std::move(other.m_thread))
+        , m_state(other.m_state.load())
+        , m_name(std::move(other.m_name))
+        , m_task(std::move(other.m_task))
+        , m_stop(other.m_stop)
+    {
+    }
+
+    /// <summary>
+    /// 移动赋值运算符
+    /// </summary>
+    ST_DedicatedThreadInfo& operator=(ST_DedicatedThreadInfo&& other) noexcept
+    {
+        if (this != &other)
+        {
+            m_thread = std::move(other.m_thread);
+            m_state = other.m_state.load();
+            m_name = std::move(other.m_name);
+            m_task = std::move(other.m_task);
+            m_stop = other.m_stop;
+        }
+        return *this;
+    }
+
+    // 禁用拷贝构造和赋值
+    ST_DedicatedThreadInfo(const ST_DedicatedThreadInfo&) = delete;
+    ST_DedicatedThreadInfo& operator=(const ST_DedicatedThreadInfo&) = delete;
+};
+
+/// <summary>
 /// 线程池类，提供基于优先级的任务调度功能
 /// </summary>
 class SDK_API ThreadPool
@@ -215,6 +277,34 @@ public:
     /// </summary>
     void Shutdown();
 
+    /// <summary>
+    /// 创建专用线程
+    /// </summary>
+    /// <param name="name">线程名称</param>
+    /// <param name="task">任务函数</param>
+    /// <returns>线程ID，用于后续管理</returns>
+    size_t CreateDedicatedThread(const std::string& name, std::function<void()> task);
+
+    /// <summary>
+    /// 停止专用线程
+    /// </summary>
+    /// <param name="threadId">线程ID</param>
+    /// <returns>是否成功停止</returns>
+    bool StopDedicatedThread(size_t threadId);
+
+    /// <summary>
+    /// 获取专用线程状态
+    /// </summary>
+    /// <param name="threadId">线程ID</param>
+    /// <returns>线程状态</returns>
+    EM_DedicatedThreadState GetDedicatedThreadState(size_t threadId) const;
+
+    /// <summary>
+    /// 获取所有专用线程信息
+    /// </summary>
+    /// <returns>专用线程信息列表</returns>
+    std::vector<std::pair<size_t, ST_DedicatedThreadInfo>> GetAllDedicatedThreads() const;
+
 private:
     /// <summary>
     /// 工作线程函数
@@ -231,6 +321,12 @@ private:
     /// </summary>
     void CreateWorkerThread();
 
+    /// <summary>
+    /// 专用线程工作函数
+    /// </summary>
+    /// <param name="threadInfo">线程信息</param>
+    void DedicatedThreadWorker(std::shared_ptr<ST_DedicatedThreadInfo> threadInfo);
+
 private:
     std::vector<std::thread> m_workers; ///< 工作线程集合
     LockFreeTaskQueue m_tasks; ///< 无锁任务队列
@@ -242,4 +338,7 @@ private:
     std::atomic<size_t> m_totalThreads{0}; ///< 总线程数
     std::atomic<size_t> m_activeThreads{0}; ///< 活动线程数
     std::atomic<bool> m_adjusting{false}; ///< 线程池调整标志
+    std::unordered_map<size_t, std::shared_ptr<ST_DedicatedThreadInfo>> m_dedicatedThreads; ///< 专用线程集合
+    mutable std::mutex m_dedicatedThreadsMutex; ///< 专用线程集合互斥锁
+    std::atomic<size_t> m_nextThreadId{0}; ///< 下一个线程ID
 };
