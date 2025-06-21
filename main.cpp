@@ -26,13 +26,13 @@
 /// </summary>
 struct ST_PerfTestResult
 {
-    double avgLatency; ///< 平均延迟（毫秒）
-    double maxLatency; ///< 最大延迟（毫秒）
-    double minLatency; ///< 最小延迟（毫秒）
-    double throughput; ///< 吞吐量（任务/秒）
-    double cpuUsage; ///< CPU使用率（%）
+    double avgLatency;   ///< 平均延迟（毫秒）
+    double maxLatency;   ///< 最大延迟（毫秒）
+    double minLatency;   ///< 最小延迟（毫秒）
+    double throughput;   ///< 吞吐量（任务/秒）
+    double cpuUsage;     ///< CPU使用率（%）
     size_t successTasks; ///< 成功完成的任务数
-    size_t failedTasks; ///< 失败的任务数
+    size_t failedTasks;  ///< 失败的任务数
 };
 
 /// <summary>
@@ -154,8 +154,7 @@ ST_PerfTestResult RunStressTest(ThreadPool& pool, size_t taskCount, int taskDura
             {
                 std::this_thread::yield();
             }
-        }
-        catch (...)
+        } catch (...)
         {
             ++failCount;
         }
@@ -182,16 +181,7 @@ ST_PerfTestResult RunStressTest(ThreadPool& pool, size_t taskCount, int taskDura
 /// </summary>
 void PrintTestResult(const std::string& testName, const ST_PerfTestResult& result)
 {
-    std::cout << "\n=== " << testName << " ===\n"
-        << std::fixed << std::setprecision(2)
-        << "平均延迟: " << result.avgLatency << " ms\n"
-        << "最大延迟: " << result.maxLatency << " ms\n"
-        << "最小延迟: " << result.minLatency << " ms\n"
-        << "吞吐量: " << result.throughput << " 任务/秒\n"
-        << "CPU使用率: " << result.cpuUsage << "%\n"
-        << "成功任务: " << result.successTasks << "\n"
-        << "失败任务: " << result.failedTasks << "\n"
-        << std::endl;
+    std::cout << "\n=== " << testName << " ===\n" << std::fixed << std::setprecision(2) << "平均延迟: " << result.avgLatency << " ms\n" << "最大延迟: " << result.maxLatency << " ms\n" << "最小延迟: " << result.minLatency << " ms\n" << "吞吐量: " << result.throughput << " 任务/秒\n" << "CPU使用率: " << result.cpuUsage << "%\n" << "成功任务: " << result.successTasks << "\n" << "失败任务: " << result.failedTasks << "\n" << std::endl;
 }
 
 /// <summary>
@@ -203,7 +193,7 @@ void StressTestThreadPool()
 
     // 减小测试规模，避免栈溢出
     const size_t TASK_COUNT = 10000; // 从100000减少到10000
-    const int TASK_DURATION = 1; // 毫秒
+    const int TASK_DURATION = 1;     // 毫秒
 
     try
     {
@@ -248,8 +238,7 @@ void StressTestThreadPool()
         auto largeResult = RunStressTest(largePool, TASK_COUNT, TASK_DURATION, false);
         PrintTestResult("大型线程池 (8-16线程)", largeResult);
         largePool.Shutdown();
-    }
-    catch (const std::exception& e)
+    } catch (const std::exception& e)
     {
         std::cerr << "压力测试异常: " << e.what() << std::endl;
     }
@@ -374,8 +363,7 @@ void TestThreadPool()
         {
             result.get();
             ++completedTasks;
-        }
-        catch (const std::exception& e)
+        } catch (const std::exception& e)
         {
             std::cerr << "任务执行失败: " << e.what() << std::endl;
         }
@@ -460,15 +448,12 @@ void TestComputeBoundTasks()
 
             // 每1000个任务或者超过1秒输出一次进度
             auto now = std::chrono::steady_clock::now();
-            if (completed % 1000 == 0 ||
-                std::chrono::duration_cast<std::chrono::seconds>(now - lastProgress).count() >= 1)
+            if (completed % 1000 == 0 || std::chrono::duration_cast<std::chrono::seconds>(now - lastProgress).count() >= 1)
             {
-                std::cout << "已完成: " << completed << "/" << TASK_COUNT
-                    << " (错误: " << errors << ")" << std::endl;
+                std::cout << "已完成: " << completed << "/" << TASK_COUNT << " (错误: " << errors << ")" << std::endl;
                 lastProgress = now;
             }
-        }
-        catch (const std::exception& e)
+        } catch (const std::exception& e)
         {
             std::cerr << "任务失败: " << e.what() << std::endl;
             ++errors;
@@ -558,15 +543,12 @@ void TestIOBoundTasks()
             maxLatency = std::max(maxLatency, latencyMs);
 
             auto now = std::chrono::steady_clock::now();
-            if (completed % 1000 == 0 ||
-                std::chrono::duration_cast<std::chrono::seconds>(now - lastProgress).count() >= 1)
+            if (completed % 1000 == 0 || std::chrono::duration_cast<std::chrono::seconds>(now - lastProgress).count() >= 1)
             {
-                std::cout << "已完成: " << completed << "/" << TASK_COUNT
-                    << " (错误: " << errors << ")" << std::endl;
+                std::cout << "已完成: " << completed << "/" << TASK_COUNT << " (错误: " << errors << ")" << std::endl;
                 lastProgress = now;
             }
-        }
-        catch (const std::exception& e)
+        } catch (const std::exception& e)
         {
             std::cerr << "任务失败: " << e.what() << std::endl;
             ++errors;
@@ -657,10 +639,7 @@ void TestMixedPriorityTasks()
             std::this_thread::sleep_for(std::chrono::milliseconds(processingTime));
 
             auto taskEnd = std::chrono::high_resolution_clock::now();
-            return std::make_pair(
-                                  static_cast<int>(priority),
-                                  std::chrono::duration_cast<std::chrono::milliseconds>(taskEnd - taskStart)
-                                 );
+            return std::make_pair(static_cast<int>(priority), std::chrono::duration_cast<std::chrono::milliseconds>(taskEnd - taskStart));
         }, priority);
 
         results.push_back(std::move(future));
@@ -691,15 +670,12 @@ void TestMixedPriorityTasks()
             maxLatency[priority] = std::max(maxLatency[priority], latencyMs);
 
             auto now = std::chrono::steady_clock::now();
-            if (completed % 1000 == 0 ||
-                std::chrono::duration_cast<std::chrono::seconds>(now - lastProgress).count() >= 1)
+            if (completed % 1000 == 0 || std::chrono::duration_cast<std::chrono::seconds>(now - lastProgress).count() >= 1)
             {
-                std::cout << "已完成: " << completed << "/" << TASK_COUNT
-                    << " (错误: " << errors << ")" << std::endl;
+                std::cout << "已完成: " << completed << "/" << TASK_COUNT << " (错误: " << errors << ")" << std::endl;
                 lastProgress = now;
             }
-        }
-        catch (const std::exception& e)
+        } catch (const std::exception& e)
         {
             std::cerr << "任务失败: " << e.what() << std::endl;
             ++errors;
@@ -722,11 +698,7 @@ void TestMixedPriorityTasks()
     {
         if (priorityCount[i] > 0)
         {
-            std::cout << priorityNames[i] << "优先级:"
-                << "\n  完成数量: " << priorityCount[i]
-                << "\n  平均延迟: " << (priorityLatency[i] / priorityCount[i]) << "ms"
-                << "\n  最大延迟: " << maxLatency[i] << "ms"
-                << std::endl;
+            std::cout << priorityNames[i] << "优先级:" << "\n  完成数量: " << priorityCount[i] << "\n  平均延迟: " << (priorityLatency[i] / priorityCount[i]) << "ms" << "\n  最大延迟: " << maxLatency[i] << "ms" << std::endl;
         }
     }
 
@@ -766,9 +738,7 @@ public:
     /// <param name="messageCount">每个线程的消息数</param>
     /// <param name="messageSize">消息大小</param>
     LogSystemStressTest(size_t threadCount, size_t messageCount, size_t messageSize)
-        : m_threadCount(threadCount)
-        , m_messageCount(messageCount)
-        , m_messageSize(messageSize)
+        : m_threadCount(threadCount), m_messageCount(messageCount), m_messageSize(messageSize)
     {
         // 配置线程池
         ST_ThreadPoolConfig threadConfig;
@@ -792,10 +762,7 @@ public:
     /// </summary>
     void RunTest()
     {
-        std::cout << "Starting stress test with:" << std::endl
-            << "Thread count: " << m_threadCount << std::endl
-            << "Messages per thread: " << m_messageCount << std::endl
-            << "Message size: " << m_messageSize << " bytes" << std::endl;
+        std::cout << "Starting stress test with:" << std::endl << "Thread count: " << m_threadCount << std::endl << "Messages per thread: " << m_messageCount << std::endl << "Message size: " << m_messageSize << " bytes" << std::endl;
 
         auto startTime = std::chrono::high_resolution_clock::now();
         std::vector<std::future<void>> futures;
@@ -827,10 +794,7 @@ public:
         double messagesPerSecond = totalMessages / totalSeconds;
         double mbPerSecond = (totalMessages * m_messageSize) / (1024.0 * 1024.0 * totalSeconds);
 
-        std::cout << "\nTest completed:" << std::endl
-            << "Total time: " << totalSeconds << " seconds" << std::endl
-            << "Messages per second: " << messagesPerSecond << std::endl
-            << "Throughput: " << mbPerSecond << " MB/s" << std::endl;
+        std::cout << "\nTest completed:" << std::endl << "Total time: " << totalSeconds << " seconds" << std::endl << "Messages per second: " << messagesPerSecond << std::endl << "Throughput: " << mbPerSecond << " MB/s" << std::endl;
     }
 
 private:
@@ -840,13 +804,7 @@ private:
     /// <param name="threadId">线程ID</param>
     void WriteLogsWorker(size_t threadId)
     {
-        std::vector<EM_LogLevel> levels = {
-            EM_LogLevel::Debug,
-            EM_LogLevel::Info,
-            EM_LogLevel::Warning,
-            EM_LogLevel::Error,
-            EM_LogLevel::Fatal
-        };
+        std::vector<EM_LogLevel> levels = {EM_LogLevel::Debug, EM_LogLevel::Info, EM_LogLevel::Warning, EM_LogLevel::Error, EM_LogLevel::Fatal};
 
         std::random_device rd;
         std::mt19937 gen(rd());
@@ -856,17 +814,14 @@ private:
         {
             std::string message = GenerateRandomMessage(m_messageSize);
             EM_LogLevel level = levels[levelDis(gen)];
-            LogSystem::Instance().WriteLog(
-                                           level,
-                                           "Thread-" + std::to_string(threadId) + ": " + message
-                                          );
+            LogSystem::Instance().WriteLog(level, QString::fromStdString("Thread-" + std::to_string(threadId) + ": " + message));
         }
     }
 
 private:
-    size_t m_threadCount; ///< 测试线程数
-    size_t m_messageCount; ///< 每个线程的消息数
-    size_t m_messageSize; ///< 消息大小
+    size_t m_threadCount;                     ///< 测试线程数
+    size_t m_messageCount;                    ///< 每个线程的消息数
+    size_t m_messageSize;                     ///< 消息大小
     std::unique_ptr<ThreadPool> m_threadPool; ///< 线程池
 };
 
@@ -881,8 +836,7 @@ int main()
         // 参数：8个线程，每个线程100000条消息，每条消息128字节
         LogSystemStressTest test(8, 100000, 128);
         test.RunTest();
-    }
-    catch (const std::exception& e)
+    } catch (const std::exception& e)
     {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
@@ -909,8 +863,7 @@ int main()
         TestMixedPriorityTasks();
 
         std::cout << "\n所有测试完成!" << std::endl;
-    }
-    catch (const std::exception& e)
+    } catch (const std::exception& e)
     {
         std::cerr << "错误: " << e.what() << std::endl;
         return 1;

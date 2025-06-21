@@ -1,306 +1,205 @@
 ﻿#include "LogSystem.h"
-#include <chrono>
-#include <ctime>
-#include <direct.h>
-#include <io.h>
-#include <iomanip>
-#include <sstream>
+#include <QtCore/QCoreApplication>
+#include <QtCore/QDir>
+#include <QtCore/QFileInfo>
+#include <QtCore/QTextCodec>
 
-LogSystem::LogSystem()
-    : m_running(false)
-    , m_currentFileSize(0)
-    , m_lastFlushTime(std::chrono::steady_clock::now())
+// LogWriteThread 实现
+LogWriteThread::LogWriteThread(QObject* parent)
+    : QThread(parent), m_currentFileSize(0), m_running(0), m_flushTimer(nullptr)
 {
-    // 初始化缓冲区池
-    for (size_t i = 0; i < BUFFER_POOL_SIZE; ++i)
-    {
-        m_bufferPool.push_back(std::make_unique<ST_LogBuffer>());
-    }
 }
 
-LogSystem::~LogSystem()
+LogWriteThread::~LogWriteThread()
 {
-    Shutdown();
+    Stop();
 }
 
-LogSystem& LogSystem::Instance()
+void LogWriteThread::SetConfig(const ST_LogConfig& config)
 {
-    static LogSystem instance;
-    return instance;
-}
-
-void LogSystem::Initialize(const ST_LogConfig& config)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
+    QMutexLocker locker(&m_queueMutex);
     m_config = config;
+}
 
-    if (!m_config.m_logFilePath.empty())
+void LogWriteThread::AddMessage(const ST_LogMessage& message)
+{
+    QMutexLocker locker(&m_queueMutex);
+
+    if (m_messageQueue.size() >= m_config.m_maxQueueSize)
     {
-        m_logFile.open(m_config.m_logFilePath, std::ios::app);
-        if (m_logFile.is_open())
+        return; // 队列已满，丢弃消息
+    }
+
+    m_messageQueue.enqueue(message);
+    m_condition.wakeOne();
+}
+
+void LogWriteThread::Stop()
+{
+    m_running.store(0);
+    m_condition.wakeAll();
+
+    if (isRunning())
+    {
+        wait(5000); // 等待5秒
+        if (isRunning())
         {
-            struct _stat64 fileStat;
-            if (_stat64(m_config.m_logFilePath.c_str(), &fileStat) == 0)
-            {
-                m_currentFileSize = fileStat.st_size;
-            }
+            terminate(); // 强制终止
+            wait(1000);
         }
     }
 
-    if (m_config.m_asyncEnabled && !m_running)
+    QMutexLocker fileLock(&m_fileMutex);
+    if (m_logFile.isOpen())
     {
-        m_running = true;
-        m_writeThread = std::make_unique<std::thread>(&LogSystem::AsyncWrite, this);
-    }
-}
-
-void LogSystem::SetLogFile(const std::string& filePath)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_logFile.is_open())
-    {
+        m_textStream.flush();
         m_logFile.close();
     }
 
-    m_config.m_logFilePath = filePath;
-    m_logFile.open(filePath, std::ios::app);
-    if (m_logFile.is_open())
+    if (m_flushTimer)
     {
-        struct _stat64 fileStat;
-        if (_stat64(filePath.c_str(), &fileStat) == 0)
-        {
-            m_currentFileSize = fileStat.st_size;
-        }
+        m_flushTimer->stop();
+        delete m_flushTimer;
+        m_flushTimer = nullptr;
     }
 }
 
-void LogSystem::SetLogLevel(EM_LogLevel level)
+void LogWriteThread::Flush()
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_config.m_logLevel = level;
-}
-
-void LogSystem::WriteLog(EM_LogLevel level, const std::string& message,
-                         const char* file, int line)
-{
-    if (level < m_config.m_logLevel)
+    QMutexLocker fileLock(&m_fileMutex);
+    if (m_textStream.device())
     {
-        return;
-    }
-
-    ST_LogMessage logMsg;
-    logMsg.m_level = level;
-    logMsg.SetMessage(message);
-    logMsg.m_timestamp = GetTimestamp();
-    logMsg.m_fileName = file ? file : "";
-    logMsg.m_lineNumber = line;
-
-    if (m_config.m_asyncEnabled)
-    {
-        bool needFlush = false;
-        {
-            std::lock_guard<std::mutex> lock(m_batchMutex);
-            if (!m_currentBatch.Add(std::move(logMsg)))
-            {
-                // 当前批次已满，通知异步线程处理
-                m_messageQueue.push(std::move(m_currentBatch));
-                m_currentBatch.Clear();
-                m_currentBatch.Add(std::move(logMsg));
-                needFlush = true;
-            }
-        }
-        if (needFlush)
-        {
-            m_condition.notify_one();
-        }
-    }
-    else
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        WriteLogToFile(logMsg);
+        m_textStream.flush();
     }
 }
 
-void LogSystem::AsyncWrite()
+void LogWriteThread::run()
 {
-    ST_LogBatch localBatch;
-    std::chrono::steady_clock::time_point lastProcessTime = std::chrono::steady_clock::now();
+    m_running.store(1);
 
-    while (m_running)
+    // 创建定时器用于定期刷新
+    m_flushTimer = new QTimer();
+    m_flushTimer->setInterval(m_config.m_flushInterval);
+    connect(m_flushTimer, &QTimer::timeout, this, &LogWriteThread::OnFlushTimer);
+    m_flushTimer->start();
+
+    // 初始化日志文件
+    InitializeLogFile();
+
+    while (m_running.load() == 1)
     {
-        bool hasBatch = false;
+        ST_LogMessage message;
+        bool hasMessage = false;
+        
         {
-            std::unique_lock<std::mutex> lock(m_mutex);
-            auto now = std::chrono::steady_clock::now();
-            auto timeSinceLastProcess = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                                                                              now - lastProcessTime).count();
-
-            // 等待新的批次或超时
-            m_condition.wait_for(lock, std::chrono::milliseconds(MAX_BATCH_WAIT_MS - timeSinceLastProcess),
-                                 [this, timeSinceLastProcess]()
-                                 {
-                                     return !m_messageQueue.empty() || !m_running || timeSinceLastProcess >= MAX_BATCH_WAIT_MS;
-                                 });
-
-            if (!m_running && m_messageQueue.empty())
+            QMutexLocker locker(&m_queueMutex);
+            if (m_messageQueue.isEmpty())
             {
-                break;
+                m_condition.wait(&m_queueMutex, 100); // 等待100ms
             }
 
-            // 获取待处理的批次
-            if (!m_messageQueue.empty())
+            if (!m_messageQueue.isEmpty())
             {
-                localBatch = std::move(m_messageQueue.front());
-                m_messageQueue.pop();
-                hasBatch = true;
-            }
-            else if (timeSinceLastProcess >= MAX_BATCH_WAIT_MS)
-            {
-                // 超时，处理当前批次
-                std::lock_guard<std::mutex> batchLock(m_batchMutex);
-                if (!m_currentBatch.m_messages.empty())
-                {
-                    localBatch = std::move(m_currentBatch);
-                    m_currentBatch.Clear();
-                    hasBatch = true;
-                }
+                message = m_messageQueue.dequeue();
+                hasMessage = true;
             }
         }
 
-        // 处理批次
-        if (hasBatch)
+        if (hasMessage)
         {
-            for (auto& msg : localBatch.m_messages)
-            {
-                WriteLogToFile(msg);
-            }
-            localBatch.Clear();
-            lastProcessTime = std::chrono::steady_clock::now();
-        }
-
-        // 定期检查并清理缓冲区池
-        static size_t cleanupCounter = 0;
-        if (++cleanupCounter >= 1000)
-        {
-            cleanupCounter = 0;
-            std::lock_guard<std::mutex> lock(m_bufferMutex);
-            while (m_bufferPool.size() > BUFFER_POOL_SIZE)
-            {
-                m_bufferPool.pop_back();
-            }
+            WriteLogToFile(message);
         }
     }
 
-    // 确保所有数据都被写入
+    // 处理剩余消息
+    QMutexLocker locker(&m_queueMutex);
+    while (!m_messageQueue.isEmpty())
+    {
+        ST_LogMessage message = m_messageQueue.dequeue();
+        WriteLogToFile(message);
+    }
+
+    // 最终刷新
+    Flush();
+
+    if (m_flushTimer)
+    {
+        m_flushTimer->stop();
+        delete m_flushTimer;
+        m_flushTimer = nullptr;
+    }
+}
+
+void LogWriteThread::OnFlushTimer()
+{
     Flush();
 }
 
-void LogSystem::WriteLogToFile(const ST_LogMessage& msg)
+void LogWriteThread::WriteLogToFile(const ST_LogMessage& message)
 {
-    if (!m_logFile.is_open())
+    QMutexLocker fileLock(&m_fileMutex);
+
+    if (m_config.m_logFilePath.isEmpty() || !m_textStream.device())
     {
         return;
     }
-
+    
     CheckRotateFile();
 
-    // 预分配字符串缓冲区，避免频繁的内存分配
-    thread_local std::string logLine;
-    logLine.clear();
-    logLine.reserve(1024); // 预分配1KB空间
+    // 构建日志行
+    QString logLine = QString("[%1] [%2] ").arg(message.m_timestamp.toString("yyyy-MM-dd hh:mm:ss.zzz")).arg(GetLevelString(message.m_level));
 
-    // 使用string的append代替stringstream，减少内存分配
-    logLine.append("[");
-    logLine.append(msg.m_timestamp);
-    logLine.append("] [");
-    logLine.append(GetLevelString(msg.m_level));
-    logLine.append("] ");
-
-    if (!msg.m_fileName.empty())
+    if (!message.m_fileName.isEmpty())
     {
-        logLine.append("(");
-        logLine.append(msg.m_fileName);
-        logLine.append(":");
-        logLine.append(std::to_string(msg.m_lineNumber));
-        logLine.append(") ");
+        logLine += QString("(%1:%2) ").arg(message.m_fileName).arg(message.m_lineNumber);
     }
 
-    logLine.append("- ");
-    if (msg.m_message)
+    logLine += QString("- %1\n").arg(message.m_message);
+
+    // 写入缓冲区
     {
-        logLine.append(msg.m_message, msg.m_messageLength);
-    }
-    logLine.append("\n");
-    
-    bool needFlush = false;
-    {
-        std::lock_guard<std::mutex> lock(m_bufferMutex);
-        if (!m_currentBuffer.Append(logLine))
+        QMutexLocker bufferLock(&m_bufferMutex);
+        m_currentLogBuffer += logLine;
+
+        // 如果缓冲区达到一定大小，立即写入文件
+        if (m_currentLogBuffer.length() > 1024) // 1KB缓冲
         {
-            // 当前缓冲区已满，压缩并写入文件
-            if (m_currentBuffer.m_size > 0)
-            {
-                ST_CompressedLogBlock block;
-                block.m_originalSize = m_currentBuffer.m_size;
-                block.m_timestamp = std::time(nullptr);
-                block.m_data = LogCompressor::Compress(m_currentBuffer.m_data, m_config.m_compressLevel);
-                block.WriteToFile(m_logFile);
-            }
-
-            // 切换到下一个缓冲区
-            if (!m_bufferPool.empty())
-            {
-                auto buffer = std::move(m_bufferPool.back());
-                m_bufferPool.pop_back();
-                std::swap(m_currentBuffer, *buffer);
-                m_bufferPool.push_back(std::move(buffer));
-            }
-            m_currentBuffer.Clear();
-            m_currentBuffer.Append(logLine);
-            needFlush = true;
+            m_textStream << m_currentLogBuffer;
+            m_textStream.flush();
+            m_currentFileSize.fetchAndAddOrdered(m_currentLogBuffer.toUtf8().size());
+            m_currentLogBuffer.clear();
         }
     }
-
-    if (needFlush || 
-        std::chrono::steady_clock::now() - m_lastFlushTime >= FLUSH_INTERVAL)
-    {
-        Flush();
-    }
-
-    m_currentFileSize += logLine.length();
 }
 
-void LogSystem::CheckRotateFile()
+void LogWriteThread::CheckRotateFile()
 {
-    if (m_currentFileSize >= m_config.m_maxFileSize)
+    if (m_currentFileSize.load() >= m_config.m_maxFileSize)
     {
+        // 先刷新缓冲区
+        {
+            QMutexLocker bufferLock(&m_bufferMutex);
+            if (!m_currentLogBuffer.isEmpty())
+            {
+                m_textStream << m_currentLogBuffer;
+                m_textStream.flush();
+                m_currentLogBuffer.clear();
+            }
+        }
+        
         m_logFile.close();
-
+        
         // 重命名当前日志文件
-        auto now = std::chrono::system_clock::now();
-        auto time = std::chrono::system_clock::to_time_t(now);
-        std::stringstream ss;
-        ss << std::put_time(std::localtime(&time), "%Y%m%d_%H%M%S");
+        QString newFileName = m_config.m_logFilePath + "." + QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss");
 
-        std::string newFileName = m_config.m_logFilePath + "." + ss.str();
-        rename(m_config.m_logFilePath.c_str(), newFileName.c_str());
+        QFile::rename(m_config.m_logFilePath, newFileName);
 
-        // 创建新的日志文件
-        m_logFile.open(m_config.m_logFilePath, std::ios::app);
-        m_currentFileSize = 0;
+        // 重新初始化日志文件
+        InitializeLogFile();
     }
 }
 
-std::string LogSystem::GetTimestamp() const
-{
-    auto now = std::chrono::system_clock::now();
-    auto time = std::chrono::system_clock::to_time_t(now);
-    std::stringstream ss;
-    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-    return ss.str();
-}
-
-const char* LogSystem::GetLevelString(EM_LogLevel level) const
+QString LogWriteThread::GetLevelString(EM_LogLevel level) const
 {
     switch (level)
     {
@@ -319,54 +218,219 @@ const char* LogSystem::GetLevelString(EM_LogLevel level) const
     }
 }
 
-void LogSystem::Flush()
+void LogWriteThread::InitializeLogFile()
 {
-    if (!m_logFile.is_open())
+    if (m_config.m_logFilePath.isEmpty())
+    {
+        return;
+    }
+    
+    // 确保目录存在
+    EnsureDirectoryExists(m_config.m_logFilePath);
+    
+    // 检查文件是否存在
+    bool fileExists = QFile::exists(m_config.m_logFilePath);
+    
+    m_logFile.setFileName(m_config.m_logFilePath);
+    
+    if (!m_logFile.open(QIODevice::WriteOnly | QIODevice::Append))
+    {
+        qDebug() << "Failed to open log file:" << m_config.m_logFilePath;
+        return;
+    }
+    
+    m_textStream.setDevice(&m_logFile);
+    // 强制设置UTF-8编码，确保中文字符正确显示
+    m_textStream.setCodec("UTF-8");
+    // 禁用自动检测，强制使用UTF-8
+    m_textStream.setAutoDetectUnicode(false);
+    // 设置生成Unicode字节序标记
+    m_textStream.setGenerateByteOrderMark(false); // 我们手动写入BOM
+    
+    // 如果是新文件，写入UTF-8 BOM
+    if (!fileExists)
+    {
+        WriteUtf8Bom();
+    }
+    
+    m_currentFileSize.store(m_logFile.size());
+}
+
+void LogWriteThread::WriteUtf8Bom()
+{
+    // 写入UTF-8 BOM (EF BB BF)
+    const unsigned char bom[] = {0xEF, 0xBB, 0xBF};
+    m_logFile.write(reinterpret_cast<const char*>(bom), 3);
+    m_logFile.flush();
+}
+
+void LogWriteThread::EnsureDirectoryExists(const QString& filePath)
+{
+    QFileInfo fileInfo(filePath);
+    QDir dir = fileInfo.absoluteDir();
+    if (!dir.exists())
+    {
+        dir.mkpath(".");
+    }
+}
+
+// LogSystem 实现
+LogSystem::LogSystem(QObject* parent)
+    : QObject(parent), m_writeThread(nullptr), m_initialized(0)
+{
+}
+
+LogSystem::~LogSystem()
+{
+    Shutdown();
+}
+
+LogSystem& LogSystem::Instance()
+{
+    static LogSystem instance;
+    return instance;
+}
+
+void LogSystem::Initialize(const ST_LogConfig& config)
+{
+    QMutexLocker locker(&m_mutex);
+
+    if (m_initialized.load() == 1)
     {
         return;
     }
 
-    ST_LogBuffer bufferToWrite;
+    m_config = config;
+
+    if (m_config.m_asyncEnabled)
     {
-        std::lock_guard<std::mutex> lock(m_bufferMutex);
-        std::swap(bufferToWrite, m_currentBuffer);
+        m_writeThread = new LogWriteThread(this);
+        m_writeThread->SetConfig(m_config);
+        m_writeThread->start();
     }
 
-    if (bufferToWrite.m_size > 0)
+    m_initialized.store(1);
+}
+
+void LogSystem::SetLogFile(const QString& filePath)
+{
+    QMutexLocker locker(&m_mutex);
+    m_config.m_logFilePath = filePath;
+
+    if (m_writeThread)
     {
-        // 压缩并写入文件
-        ST_CompressedLogBlock block;
-        block.m_originalSize = bufferToWrite.m_size;
-        block.m_timestamp = std::time(nullptr);
-        block.m_data = LogCompressor::Compress(bufferToWrite.m_data, m_config.m_compressLevel);
-        block.WriteToFile(m_logFile);
-        m_logFile.flush();
-        m_lastFlushTime = std::chrono::steady_clock::now();
+        ST_LogConfig newConfig = m_config;
+        newConfig.m_logFilePath = filePath;
+        m_writeThread->SetConfig(newConfig);
+    }
+}
+
+void LogSystem::SetLogLevel(EM_LogLevel level)
+{
+    QMutexLocker locker(&m_mutex);
+    m_config.m_logLevel = level;
+
+    if (m_writeThread)
+    {
+        ST_LogConfig newConfig = m_config;
+        newConfig.m_logLevel = level;
+        m_writeThread->SetConfig(newConfig);
+    }
+}
+
+void LogSystem::WriteLog(EM_LogLevel level, const QString& message, const char* file, int line)
+{
+    if (level < m_config.m_logLevel)
+    {
+        return;
+    }
+    
+    ST_LogMessage logMsg;
+    logMsg.m_level = level;
+    logMsg.m_message = message;
+    logMsg.m_timestamp = QDateTime::currentDateTime();
+    logMsg.m_fileName = file ? GetBaseName(file) : QString();
+    logMsg.m_lineNumber = line;
+    
+    if (m_config.m_asyncEnabled && m_writeThread)
+    {
+        m_writeThread->AddMessage(logMsg);
+    }
+    else
+    {
+        // 同步写入到控制台作为备用
+        QString logLine = QString("[%1] [%2] ").arg(logMsg.m_timestamp.toString("yyyy-MM-dd hh:mm:ss.zzz")).arg(GetLevelString(logMsg.m_level));
+        
+        if (!logMsg.m_fileName.isEmpty())
+        {
+            logLine += QString("(%1:%2) ").arg(logMsg.m_fileName).arg(logMsg.m_lineNumber);
+        }
+        
+        logLine += QString("- %1").arg(logMsg.m_message);
+        
+        qDebug() << logLine;
+    }
+}
+
+void LogSystem::WriteLog(EM_LogLevel level, const std::string& message, const char* file, int line)
+{
+    // 将std::string转换为QString，确保正确处理UTF-8编码
+    WriteLog(level, QString::fromUtf8(message.c_str()), file, line);
+}
+
+void LogSystem::Flush()
+{
+    if (m_writeThread)
+    {
+        m_writeThread->Flush();
     }
 }
 
 void LogSystem::Shutdown()
 {
+    QMutexLocker locker(&m_mutex);
+
+    if (m_initialized.load() == 0)
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        if (!m_running)
-        {
-            return;
-        }
-        m_running = false;
+        return;
     }
 
-    m_condition.notify_all();
-    if (m_writeThread && m_writeThread->joinable())
+    if (m_writeThread)
     {
-        m_writeThread->join();
+        m_writeThread->Stop();
+        delete m_writeThread;
+        m_writeThread = nullptr;
     }
 
-    Flush(); // 确保所有数据都被写入
+    m_initialized.store(0);
+}
 
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_logFile.is_open())
+QString LogSystem::GetBaseName(const char* filePath) const
+{
+    if (!filePath)
     {
-        m_logFile.close();
+        return QString();
+    }
+
+    QFileInfo fileInfo(QString::fromLocal8Bit(filePath));
+    return fileInfo.baseName();
+}
+
+QString LogSystem::GetLevelString(EM_LogLevel level) const
+{
+    switch (level)
+    {
+        case EM_LogLevel::Debug:
+            return "DEBUG";
+        case EM_LogLevel::Info:
+            return "INFO";
+        case EM_LogLevel::Warning:
+            return "WARN";
+        case EM_LogLevel::Error:
+            return "ERROR";
+        case EM_LogLevel::Fatal:
+            return "FATAL";
+        default:
+            return "UNKNOWN";
     }
 }
