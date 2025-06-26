@@ -302,26 +302,8 @@ void ThreadPool::DedicatedThreadWorker(std::shared_ptr<ST_DedicatedThreadInfo> t
 {
     try
     {
-        while (true)
-        {
-            {
-                std::unique_lock<std::mutex> lock(threadInfo->m_mutex);
-                if (threadInfo->m_stop)
-                {
-                    break;
-                }
-            }
-
-            threadInfo->m_task();
-
-            {
-                std::unique_lock<std::mutex> lock(threadInfo->m_mutex);
-                if (threadInfo->m_stop)
-                {
-                    break;
-                }
-            }
-        }
+        threadInfo->m_task();  // 执行一次任务后结束
+        threadInfo->m_state = EM_DedicatedThreadState::Stopped;
     }
     catch (...)
     {
